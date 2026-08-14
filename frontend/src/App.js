@@ -13,6 +13,19 @@ import {
   loginAdmin,
   saveAdminSettings,
   uploadSparePartImage,
+  saveSparePart,
+  deleteSparePart,
+  saveSale,
+  deleteSale,
+  saveExpense,
+  deleteExpense,
+  saveSupplier,
+  deleteSupplier,
+  savePurchaseOrder,
+  deletePurchaseOrder,
+  saveStockMovement,
+  updateSparePartStock,
+  updateSparePartPrices,
 } from './supabase';
 
 const categories = ['All', 'Engine Parts', 'Brake System', 'Electrical', 'Suspension', 'Transmission'];
@@ -132,7 +145,6 @@ function App() {
   const [supabaseEnabled, setSupabaseEnabled] = useState(false);
   const [adminAuthenticated, setAdminAuthenticated] = useState(false);
   const [adminSection, setAdminSection] = useState('stock');
-  const [imageFile, setImageFile] = useState(null);
   const [supplierQuery, setSupplierQuery] = useState('');
   const [orderQuery, setOrderQuery] = useState('');
   const [saleQuery, setSaleQuery] = useState('');
@@ -143,6 +155,8 @@ function App() {
   const [editingExpenseId, setEditingExpenseId] = useState(null);
   const [costForm, setCostForm] = useState(emptyCostForm);
   const [costQuery, setCostQuery] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [zoomedImage, setZoomedImage] = useState(null);
 
   const applyDataBundle = (bundle) => {
     const nextSettings = {
@@ -249,22 +263,34 @@ function App() {
     return haystack.includes(expenseQuery.toLowerCase());
   });
 
-  const handleAdjustCost = (event) => {
+  const handleAdjustCost = async (event) => {
     event.preventDefault();
     if (!costForm.itemId) return;
 
     const item = inventory.find((entry) => String(entry.id) === String(costForm.itemId));
     if (!item) return;
 
-    const updatedItem = {
-      ...item,
-      cost: Number(costForm.newCost) || 0,
-      salePrice: Number(costForm.newSalePrice) || item.salePrice,
-    };
+    const newCost = Number(costForm.newCost) || 0;
+    const newSalePrice = Number(costForm.newSalePrice) || item.salePrice;
+
+    if (supabaseEnabled) {
+      const res = await updateSparePartPrices(costForm.itemId, newCost, newSalePrice);
+      if (!res.success) {
+        setStatusMessage(`Error updating prices in Supabase: ${res.error}`);
+        return;
+      }
+      await saveStockMovement({
+        type: 'Price Adjustment',
+        itemName: `${item.brand} ${item.name}`,
+        quantity: 0,
+        date: makeToday(),
+        note: `Cost: ${item.cost} → ${newCost}`,
+      });
+    }
 
     setInventory((previous) =>
       previous.map((entry) =>
-        String(entry.id) === String(costForm.itemId) ? updatedItem : entry
+        String(entry.id) === String(costForm.itemId) ? { ...entry, cost: newCost, salePrice: newSalePrice } : entry
       )
     );
 
@@ -275,7 +301,7 @@ function App() {
         itemName: `${item.brand} ${item.name}`,
         quantity: 0,
         date: makeToday(),
-        note: `Cost: ${item.cost} → ${Number(costForm.newCost)}`,
+        note: `Cost: ${item.cost} → ${newCost}`,
       },
       ...previous,
     ]);
@@ -315,20 +341,20 @@ function App() {
 
     const allowedAdmin = (settings.adminEmail || settings.admin_email || '').trim().toLowerCase();
     const normalizedEmail = email.toLowerCase();
-    const demoMode = !supabaseEnabled;
 
-    if (!demoMode && allowedAdmin && normalizedEmail !== allowedAdmin) {
+    if (allowedAdmin && normalizedEmail !== allowedAdmin) {
       setStatusMessage(`Only ${allowedAdmin} can access the admin section.`);
       return;
     }
 
     const result = await loginAdmin(email, password);
 
-    if (result.success || demoMode) {
+    if (result.success) {
       setAdminAuthenticated(true);
-      setStatusMessage(demoMode ? 'Demo admin access granted.' : 'Admin access granted.');
+      setStatusMessage(`Admin access granted (${result.email}).`);
     } else {
-      setStatusMessage(result.error || 'Admin login failed.');
+      setAdminAuthenticated(false);
+      setStatusMessage(`Login failed: ${result.error || 'Invalid password or email.'}`);
     }
   };
 
@@ -350,39 +376,88 @@ function App() {
       stockMovements: [],
       settings: { ...settings },
     });
-    setStatusMessage('All demo data cleared. The dashboard is now empty.');
+    setStatusMessage('All data cleared. Dashboard is now empty.');
   };
 
-  const handleImageUpload = async () => {
-  if (!imageFile) {
-    setStatusMessage('Choose a spare-part image first.');
-    return;
-  }
+  const resizeImageFile = (file, maxWidth = 1000, maxHeight = 1000, quality = 0.85) => {
+    return new Promise((resolve) => {
+      if (!file || !file.type.startsWith('image/')) {
+        resolve({ blob: file, dataUrl: null });
+        return;
+      }
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let width = img.width;
+        let height = img.height;
 
-  setStatusMessage('Uploading...');
-  const result = await uploadSparePartImage(imageFile);
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
 
-  if (!result.success) {
-    setStatusMessage(result.error || 'Image upload failed.');
-    return;
-  }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
 
-  // ✅ Update form state
-  setStockForm(prev => ({ ...prev, imageUrl: result.url }));
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve({ blob: file, dataUrl: canvas.toDataURL('image/jpeg', quality) });
+              return;
+            }
+            const resizedFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            resolve({ blob: resizedFile, dataUrl: canvas.toDataURL('image/jpeg', quality) });
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = () => resolve({ blob: file, dataUrl: null });
+      img.src = url;
+    });
+  };
 
-  // ✅ Optionally persist directly to DB if editing an existing part
-  if (stockForm.id) {
-    const supabase = getSupabaseClient();
-    await supabase.from('spares')
-      .update({ image_url: result.url })
-      .eq('id', stockForm.id);
-  }
+  const handleAutoImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  setStatusMessage('Image uploaded and saved.');
-  setImageFile(null);
-};
+    setUploadingImage(true);
+    setStatusMessage('⚡ Resizing & compressing image from device...');
 
-  const handleAddStock = (event) => {
+    const { blob: resizedFile, dataUrl } = await resizeImageFile(file, 1000, 1000, 0.85);
+
+    if (dataUrl) {
+      setStockForm((prev) => ({ ...prev, imageUrl: dataUrl }));
+    }
+
+    setStatusMessage('Uploading resized image to Supabase...');
+    const result = await uploadSparePartImage(resizedFile || file, editingItemId);
+
+    if (result.success && result.url) {
+      setStockForm((prev) => ({ ...prev, imageUrl: result.url }));
+      setStatusMessage('✓ Resized image uploaded & attached successfully.');
+    } else if (dataUrl) {
+      setStockForm((prev) => ({ ...prev, imageUrl: dataUrl }));
+      setStatusMessage('✓ Resized image attached.');
+    } else {
+      setStatusMessage('Error uploading image.');
+    }
+    setUploadingImage(false);
+  };
+
+  const handleAddStock = async (event) => {
     event.preventDefault();
 
     const imageUrlValue = stockForm.imageUrl?.trim() || '';
@@ -401,38 +476,34 @@ function App() {
 
     if (!submittedItem.name) return;
 
-    // Warn if no image URL is present
-    if (!imageUrlValue) {
-      const shouldContinue = window.confirm(
-        '⚠️ No image URL found!\n\n' +
-        'The Image URL field is empty. This means:\n' +
-        '• If you uploaded to Supabase, the upload might have failed\n' +
-        '• If you pasted a URL, it may not have saved\n\n' +
-        'Check the browser console for error messages.\n\n' +
-        'Click OK to save anyway (with no image)\n' +
-        'Click Cancel to go back and add an image'
-      );
-      if (!shouldContinue) return;
-    }
+    let savedItem = { ...submittedItem, id: editingItemId || Date.now() };
 
-    console.log('📸 Saving spare part with image URL:', submittedItem.imageUrl || '(empty)');
+    if (supabaseEnabled) {
+      const res = await saveSparePart({ id: editingItemId, ...submittedItem });
+      if (res.success && res.data) {
+        savedItem = res.data;
+      } else if (!res.success) {
+        setStatusMessage(`Error saving spare part: ${res.error}`);
+        return;
+      }
+
+      await saveStockMovement({
+        type: 'Stock In',
+        itemName: `${submittedItem.brand} ${submittedItem.name}`,
+        quantity: Number(submittedItem.stock),
+        date: makeToday(),
+        note: editingItemId ? 'Inventory adjusted in admin panel' : 'New stock entry added',
+      });
+    }
 
     if (editingItemId) {
       setInventory((previous) =>
-        previous.map((item) =>
-          item.id === editingItemId ? { ...item, ...submittedItem } : item
-        )
+        previous.map((item) => (String(item.id) === String(editingItemId) ? savedItem : item))
       );
       setStatusMessage('Spare part updated successfully.');
     } else {
-      const newItem = { ...submittedItem, id: Date.now() };
-      console.log('📦 New item created:', newItem);
-      setInventory((previous) => [newItem, ...previous]);
-      setStatusMessage(
-        imageUrlValue
-          ? 'Spare part added successfully with image.'
-          : 'Spare part added successfully. (No image provided)'
-      );
+      setInventory((previous) => [savedItem, ...previous]);
+      setStatusMessage('Spare part added successfully.');
     }
 
     setStockMovements((previous) => [
@@ -470,40 +541,67 @@ function App() {
     setActiveTab('admin');
   };
 
-  const handleDeleteItem = (itemId) => {
-    setInventory((previous) => previous.filter((item) => item.id !== itemId));
-    if (editingItemId === itemId) {
+  const handleDeleteItem = async (itemId) => {
+    if (supabaseEnabled) {
+      const res = await deleteSparePart(itemId);
+      if (!res.success) {
+        setStatusMessage(`Error deleting spare part: ${res.error}`);
+        return;
+      }
+    }
+    setInventory((previous) => previous.filter((item) => String(item.id) !== String(itemId)));
+    if (String(editingItemId) === String(itemId)) {
       setEditingItemId(null);
       setStockForm(emptyStockForm);
     }
     setStatusMessage('Spare part deleted successfully.');
   };
 
-  const handleAddSale = (event) => {
+  const handleAddSale = async (event) => {
     event.preventDefault();
     const chosenItem = inventory.find((item) => String(item.id) === String(saleForm.itemId));
     if (!chosenItem) return;
 
     const quantity = Number(saleForm.quantity) || 1;
     const amount = Number(saleForm.amount) || Number(chosenItem.salePrice || 0);
+    const saleItemName = `${chosenItem.brand} ${chosenItem.name}`;
+
+    let savedSale = {
+      id: editingSaleId || Date.now(),
+      item: saleItemName,
+      amount,
+      date: saleForm.date,
+    };
+
+    if (supabaseEnabled) {
+      const res = await saveSale({ id: editingSaleId, item: saleItemName, amount, date: saleForm.date });
+      if (res.success && res.data) {
+        savedSale = res.data;
+      } else if (!res.success) {
+        setStatusMessage(`Error saving sale: ${res.error}`);
+        return;
+      }
+
+      if (!editingSaleId) {
+        const newStock = Math.max(0, Number(chosenItem.stock) - quantity);
+        await updateSparePartStock(chosenItem.id, newStock);
+        await saveStockMovement({
+          type: 'Sale',
+          itemName: saleItemName,
+          quantity: -quantity,
+          date: saleForm.date,
+          note: 'Customer sale recorded',
+        });
+      }
+    }
 
     if (editingSaleId) {
       setSales((previous) => previous.map((sale) =>
-        sale.id === editingSaleId
-          ? { ...sale, item: `${chosenItem.brand} ${chosenItem.name}`, amount, date: saleForm.date }
-          : sale
+        String(sale.id) === String(editingSaleId) ? savedSale : sale
       ));
       setStatusMessage('Sale updated successfully.');
     } else {
-      setSales((previous) => [
-        {
-          id: Date.now(),
-          item: `${chosenItem.brand} ${chosenItem.name}`,
-          amount,
-          date: saleForm.date,
-        },
-        ...previous,
-      ]);
+      setSales((previous) => [savedSale, ...previous]);
 
       setInventory((previous) =>
         previous.map((item) =>
@@ -517,7 +615,7 @@ function App() {
         {
           id: Date.now(),
           type: 'Sale',
-          itemName: `${chosenItem.brand} ${chosenItem.name}`,
+          itemName: saleItemName,
           quantity: -quantity,
           date: saleForm.date,
           note: 'Customer sale recorded',
@@ -536,49 +634,77 @@ function App() {
     setActiveTab('dashboard');
   };
 
-  const handleAddExpense = (event) => {
+  const handleAddExpense = async (event) => {
     event.preventDefault();
     const amount = Number(expenseForm.amount) || 0;
+    if (!amount || amount <= 0) {
+      setStatusMessage('⚠️ Please enter an expense amount greater than 0.');
+      return;
+    }
 
-    if (!amount) return;
+    const expenseDate = expenseForm.date || makeToday();
+
+    let savedExpense = {
+      id: editingExpenseId || Date.now(),
+      type: expenseForm.type || 'General Expense',
+      amount,
+      note: expenseForm.note || 'Manual expense entry',
+      date: expenseDate,
+    };
+
+    if (supabaseEnabled) {
+      const res = await saveExpense({
+        id: editingExpenseId,
+        type: expenseForm.type || 'General Expense',
+        amount,
+        note: expenseForm.note || 'Manual expense entry',
+        date: expenseDate,
+      });
+      if (res.success && res.data) {
+        savedExpense = res.data;
+      } else if (!res.success) {
+        setStatusMessage(`Error saving expense: ${res.error}`);
+        return;
+      }
+    }
 
     if (editingExpenseId) {
       setExpenses((previous) => previous.map((expense) =>
-        expense.id === editingExpenseId
-          ? { ...expense, type: expenseForm.type, amount, note: expenseForm.note || 'Manual expense entry', date: expenseForm.date }
-          : expense
+        String(expense.id) === String(editingExpenseId) ? savedExpense : expense
       ));
-      setStatusMessage('Expense updated successfully.');
+      setStatusMessage('✓ Expense updated successfully.');
     } else {
-      setExpenses((previous) => [
-        {
-          id: Date.now(),
-          type: expenseForm.type,
-          amount,
-          note: expenseForm.note || 'Manual expense entry',
-          date: expenseForm.date,
-        },
-        ...previous,
-      ]);
-      setStatusMessage('Expense recorded successfully.');
+      setExpenses((previous) => [savedExpense, ...previous]);
+      setStatusMessage('✓ Expense recorded successfully.');
     }
 
-    setExpenseForm({ ...emptyExpenseForm });
+    setExpenseForm({ ...emptyExpenseForm, date: makeToday() });
     setEditingExpenseId(null);
-    setActiveTab('dashboard');
   };
 
-  const handleSupplierSubmit = (event) => {
+  const handleSupplierSubmit = async (event) => {
     event.preventDefault();
     if (!supplierForm.name.trim()) return;
 
+    let savedSupplier = { ...supplierForm, id: editingSupplierId || Date.now() };
+
+    if (supabaseEnabled) {
+      const res = await saveSupplier({ id: editingSupplierId, ...supplierForm });
+      if (res.success && res.data) {
+        savedSupplier = res.data;
+      } else if (!res.success) {
+        setStatusMessage(`Error saving supplier: ${res.error}`);
+        return;
+      }
+    }
+
     if (editingSupplierId) {
       setSuppliers((previous) => previous.map((supplier) =>
-        supplier.id === editingSupplierId ? { ...supplier, ...supplierForm } : supplier
+        String(supplier.id) === String(editingSupplierId) ? savedSupplier : supplier
       ));
       setStatusMessage('Supplier updated successfully.');
     } else {
-      setSuppliers((previous) => [{ ...supplierForm, id: Date.now() }, ...previous]);
+      setSuppliers((previous) => [savedSupplier, ...previous]);
       setStatusMessage('Supplier added successfully.');
     }
 
@@ -586,32 +712,136 @@ function App() {
     setEditingSupplierId(null);
   };
 
-  const handleDeleteSupplier = (supplierId) => {
-    setSuppliers((previous) => previous.filter((supplier) => supplier.id !== supplierId));
+  const handleDeleteSupplier = async (supplierId) => {
+    if (supabaseEnabled) {
+      const res = await deleteSupplier(supplierId);
+      if (!res.success) {
+        setStatusMessage(`Error deleting supplier: ${res.error}`);
+        return;
+      }
+    }
+    setSuppliers((previous) => previous.filter((supplier) => String(supplier.id) !== String(supplierId)));
     setStatusMessage('Supplier deleted successfully.');
   };
 
-  const handleDeleteOrder = (orderId) => {
-    setPurchaseOrders((previous) => previous.filter((order) => order.id !== orderId));
+  const handlePurchaseOrderSubmit = async (event) => {
+    event.preventDefault();
+    if (!purchaseForm.itemId || !purchaseForm.supplierId) return;
+
+    const item = inventory.find((entry) => String(entry.id) === String(purchaseForm.itemId));
+    const supplier = suppliers.find((entry) => String(entry.id) === String(purchaseForm.supplierId));
+
+    const targetOrder = {
+      supplierId: purchaseForm.supplierId,
+      supplierName: supplier ? supplier.name : 'Unknown supplier',
+      itemId: purchaseForm.itemId,
+      itemName: item ? item.name : 'Unknown item',
+      quantity: Number(purchaseForm.quantity) || 0,
+      unitCost: Number(purchaseForm.unitCost) || 0,
+      orderDate: purchaseForm.orderDate,
+      status: purchaseForm.status,
+    };
+
+    let savedOrder = { ...targetOrder, id: editingOrderId || Date.now() };
+
+    if (supabaseEnabled) {
+      const res = await savePurchaseOrder({ id: editingOrderId, ...targetOrder });
+      if (res.success && res.data) {
+        savedOrder = res.data;
+      } else if (!res.success) {
+        setStatusMessage(`Error saving purchase order: ${res.error}`);
+        return;
+      }
+
+      if (purchaseForm.status === 'Received' && !editingOrderId && item) {
+        const newStock = Number(item.stock) + Number(purchaseForm.quantity || 0);
+        await updateSparePartStock(item.id, newStock);
+        await saveStockMovement({
+          type: 'Stock In',
+          itemName: `${item.brand} ${item.name}`,
+          quantity: Number(purchaseForm.quantity) || 0,
+          date: purchaseForm.orderDate,
+          note: 'Purchase order received',
+        });
+      }
+    }
+
+    setPurchaseOrders((previous) => {
+      if (editingOrderId) {
+        return previous.map((order) => String(order.id) === String(editingOrderId) ? savedOrder : order);
+      }
+      return [savedOrder, ...previous];
+    });
+
+    if (purchaseForm.status === 'Received' && !editingOrderId && item) {
+      setInventory((previous) => previous.map((entry) =>
+        String(entry.id) === String(purchaseForm.itemId)
+          ? { ...entry, stock: Number(entry.stock) + Number(purchaseForm.quantity || 0) }
+          : entry
+      ));
+
+      setStockMovements((previous) => [{
+        id: Date.now(),
+        type: 'Stock In',
+        itemName: `${item.brand} ${item.name}`,
+        quantity: Number(purchaseForm.quantity) || 0,
+        date: purchaseForm.orderDate,
+        note: 'Purchase order received',
+      }, ...previous]);
+    }
+
+    setStatusMessage(editingOrderId ? 'Purchase order updated.' : 'Purchase order created.');
+    setPurchaseForm(emptyPurchaseForm);
+    setEditingOrderId(null);
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    if (supabaseEnabled) {
+      const res = await deletePurchaseOrder(orderId);
+      if (!res.success) {
+        setStatusMessage(`Error deleting purchase order: ${res.error}`);
+        return;
+      }
+    }
+    setPurchaseOrders((previous) => previous.filter((order) => String(order.id) !== String(orderId)));
     setStatusMessage('Purchase order deleted successfully.');
   };
 
-  const handleDeleteSale = (saleId) => {
-    setSales((previous) => previous.filter((sale) => sale.id !== saleId));
+  const handleDeleteSale = async (saleId) => {
+    if (supabaseEnabled) {
+      const res = await deleteSale(saleId);
+      if (!res.success) {
+        setStatusMessage(`Error deleting sale: ${res.error}`);
+        return;
+      }
+    }
+    setSales((previous) => previous.filter((sale) => String(sale.id) !== String(saleId)));
     setStatusMessage('Sale deleted successfully.');
   };
 
-  const handleDeleteExpense = (expenseId) => {
-    setExpenses((previous) => previous.filter((expense) => expense.id !== expenseId));
+  const handleDeleteExpense = async (expenseId) => {
+    if (supabaseEnabled) {
+      const res = await deleteExpense(expenseId);
+      if (!res.success) {
+        setStatusMessage(`Error deleting expense: ${res.error}`);
+        return;
+      }
+    }
+    setExpenses((previous) => previous.filter((expense) => String(expense.id) !== String(expenseId)));
     setStatusMessage('Expense deleted successfully.');
   };
 
-  const dashboardCards = [
-    { label: 'Total Income', value: `KES ${totalSales.toLocaleString()}` },
-    { label: 'Liabilities', value: `KES ${totalExpenses.toLocaleString()}` },
-    { label: 'Stock Units', value: inventory.reduce((sum, item) => sum + Number(item.stock || 0), 0).toLocaleString() },
-    { label: 'Profit / Loss', value: `KES ${profitAndLoss.toLocaleString()}` },
-  ];
+  const dashboardCards = adminAuthenticated
+    ? [
+        { label: 'Total Income', value: `KES ${totalSales.toLocaleString()}` },
+        { label: 'Liabilities', value: `KES ${totalExpenses.toLocaleString()}` },
+        { label: 'Stock Units', value: inventory.reduce((sum, item) => sum + Number(item.stock || 0), 0).toLocaleString() },
+        { label: 'Profit / Loss', value: `KES ${profitAndLoss.toLocaleString()}` },
+      ]
+    : [
+        { label: 'Spare Parts Catalog', value: inventory.length.toLocaleString() },
+        { label: 'Available Stock Units', value: inventory.reduce((sum, item) => sum + Number(item.stock || 0), 0).toLocaleString() },
+      ];
 
   const adminModuleStats = [
     { label: 'Parts', value: inventory.length },
@@ -620,6 +850,11 @@ function App() {
     { label: 'Sales', value: sales.length },
     { label: 'Expenses', value: expenses.length },
   ];
+
+  const handleAdminLogout = () => {
+    setAdminAuthenticated(false);
+    setStatusMessage('Logged out of Admin mode.');
+  };
 
   return (
     <div className="app-shell">
@@ -639,20 +874,22 @@ function App() {
               Dashboard
             </button>
             <button className={activeTab === 'inventory' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveTab('inventory')}>
-              Inventory
+              Inventory Catalog
             </button>
             <button className={activeTab === 'admin' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveTab('admin')}>
-              Admin Panel
+              {adminAuthenticated ? '⚙️ Admin Panel' : '🔒 Admin Login'}
             </button>
           </nav>
 
           <div className="sidebar-summary">
+            {adminAuthenticated && (
+              <div className="sidebar-summary-card">
+                <small>Total Stock Value</small>
+                <strong>KES {inventory.reduce((sum, item) => sum + (Number(item.stock || 0) * Number(item.cost || 0)), 0).toLocaleString()}</strong>
+              </div>
+            )}
             <div className="sidebar-summary-card">
-              <small>Stock value</small>
-              <strong>KES {inventory.reduce((sum, item) => sum + (Number(item.stock || 0) * Number(item.cost || 0)), 0).toLocaleString()}</strong>
-            </div>
-            <div className="sidebar-summary-card">
-              <small>Low stock</small>
+              <small>Low Stock Alerts</small>
               <strong>{lowStockItems.length}</strong>
             </div>
           </div>
@@ -673,10 +910,24 @@ function App() {
                 <h2>Autospares Stock Dashboard</h2>
               </div>
               <div className="topbar-actions">
-                <span className="pill">Profit and Loss</span>
-                <button type="button" className="primary-btn small print-btn" onClick={() => window.print()}>
-                  Print Report
-                </button>
+                {adminAuthenticated ? (
+                  <>
+                    <span className="pill">Profit and Loss</span>
+                    <button type="button" className="primary-btn small print-btn" onClick={() => window.print()}>
+                      🖨️ Print Financial Report
+                    </button>
+                    <button type="button" className="ghost-btn small" onClick={handleAdminLogout}>
+                      Logout Admin
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="pill">Public Catalog Mode</span>
+                    <button type="button" className="primary-btn small" onClick={() => setActiveTab('admin')}>
+                      🔒 Admin Login
+                    </button>
+                  </>
+                )}
               </div>
             </header>
 
@@ -689,31 +940,42 @@ function App() {
               ))}
             </section>
 
-            <section className="content-grid">
-              <div className="panel">
-                <h3>Sales Summary</h3>
-                <ul className="list">
-                  {sales.map((sale) => (
-                    <li key={sale.id}>
-                      <span>{sale.item}</span>
-                      <strong>KES {Number(sale.amount).toLocaleString()}</strong>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            {adminAuthenticated ? (
+              <section className="content-grid">
+                <div className="panel">
+                  <h3>Sales Summary</h3>
+                  <ul className="list">
+                    {sales.map((sale) => (
+                      <li key={sale.id}>
+                        <span>{sale.item}</span>
+                        <strong>KES {Number(sale.amount).toLocaleString()}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
-              <div className="panel">
-                <h3>Liabilities / Expenses</h3>
-                <ul className="list">
-                  {expenses.map((expense) => (
-                    <li key={expense.id}>
-                      <span>{expense.type}</span>
-                      <strong>KES {Number(expense.amount).toLocaleString()}</strong>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </section>
+                <div className="panel">
+                  <h3>Liabilities / Expenses</h3>
+                  <ul className="list">
+                    {expenses.map((expense) => (
+                      <li key={expense.id}>
+                        <span>{expense.type}</span>
+                        <strong>KES {Number(expense.amount).toLocaleString()}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </section>
+            ) : (
+              <section className="content-grid">
+                <div className="panel" style={{ gridColumn: '1 / -1' }}>
+                  <h3>Welcome to {settings.businessName}</h3>
+                  <p style={{ color: '#64748b' }}>
+                    Browse our full inventory of quality vehicle spare parts. Select a category below or search by part name, brand, or model to check live prices and stock availability.
+                  </p>
+                </div>
+              </section>
+            )}
           </>
         )}
 
@@ -723,6 +985,13 @@ function App() {
               <div>
                 <p className="eyebrow">Stock</p>
                 <h2>Spare Part Inventory</h2>
+              </div>
+              <div className="topbar-actions">
+                {adminAuthenticated && (
+                  <button type="button" className="primary-btn small print-btn" onClick={() => window.print()}>
+                    🖨️ Print Inventory Report
+                  </button>
+                )}
               </div>
             </header>
 
@@ -758,7 +1027,12 @@ function App() {
                     className={`inventory-card ${isLow ? 'warning' : ''}`}
                     title={hasImage ? `Image URL: ${item.imageUrl}` : 'No custom image URL stored'}
                   >
-                    <div style={{ position: 'relative' }}>
+                    <div 
+                      className="part-image-container"
+                      onClick={() => setZoomedImage({ url: hasImage ? item.imageUrl : fallbackImage, title: `${item.brand} ${item.name}` })}
+                      style={{ cursor: 'zoom-in' }}
+                      title="Click to expand & view full-size image"
+                    >
                       <img
                         src={hasImage ? item.imageUrl : fallbackImage}
                         alt={item.name}
@@ -782,6 +1056,18 @@ function App() {
                           ✓ Custom
                         </div>
                       )}
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '8px',
+                        right: '8px',
+                        background: 'rgba(0,0,0,0.6)',
+                        color: 'white',
+                        padding: '3px 6px',
+                        borderRadius: '4px',
+                        fontSize: '0.65rem',
+                      }}>
+                        🔍 Zoom
+                      </div>
                     </div>
                     <div className="card-head">
                       <span>{item.category}</span>
@@ -790,23 +1076,31 @@ function App() {
                     <h3>{item.name}</h3>
                     <p>{item.model}</p>
                     <div className="supplier-line">Supplier: {item.supplier || 'N/A'}</div>
-                    <div className="metrics">
+                    <div className="metrics" style={{ gridTemplateColumns: adminAuthenticated ? 'repeat(3, minmax(0, 1fr))' : 'repeat(2, minmax(0, 1fr))' }}>
                       <div>
                         <small>Stock</small>
                         <strong>{item.stock}</strong>
                       </div>
+                      {adminAuthenticated && (
+                        <div>
+                          <small>Cost</small>
+                          <strong>KES {Number(item.cost).toLocaleString()}</strong>
+                        </div>
+                      )}
                       <div>
-                        <small>Cost</small>
-                        <strong>KES {Number(item.cost).toLocaleString()}</strong>
-                      </div>
-                      <div>
-                        <small>Sell</small>
+                        <small>Selling Price</small>
                         <strong>KES {Number(item.salePrice).toLocaleString()}</strong>
                       </div>
                     </div>
                     <div className="reorder-note">
                       {isLow ? 'Low stock - reorder required' : 'Stock level healthy'}
                     </div>
+                    {adminAuthenticated && (
+                      <div className="mini-actions" style={{ marginTop: '10px' }}>
+                        <button type="button" className="ghost-btn small" onClick={() => handleEditItem(item)}>Edit</button>
+                        <button type="button" className="danger-btn small" onClick={() => handleDeleteItem(item.id)}>Delete</button>
+                      </div>
+                    )}
                   </article>
                 );
               }) : <p className="empty-state">No parts match your search.</p>}
@@ -922,25 +1216,46 @@ function App() {
                           onChange={(event) => setStockForm({ ...stockForm, supplier: event.target.value })}
                         />
                       </label>
-                      <label>
-                        Image URL
-                        <input
-                          value={stockForm.imageUrl}
-                          onChange={(event) => setStockForm({ ...stockForm, imageUrl: event.target.value })}
-                          placeholder="Paste image URL or upload below"
-                        />
-                      </label>
-                      <small style={{ color: '#6b7280', marginTop: '-10px' }}>
-                        You can paste an image URL here, or upload a file using Supabase (if configured)
-                      </small>
+                      <div className="file-upload-box" style={{
+                        background: '#f8fafc',
+                        border: '2px dashed #cbd5e1',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        margin: '12px 0',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                      }}>
+                        <label style={{ cursor: 'pointer', display: 'block' }}>
+                          <div style={{ fontSize: '1.8rem', marginBottom: '4px' }}>📷</div>
+                          <strong style={{ color: '#1e293b', fontSize: '0.95rem' }}>
+                            Choose image from your device
+                          </strong>
+                          <small style={{ display: 'block', color: '#64748b', marginTop: '2px' }}>
+                            Image uploads & attaches automatically
+                          </small>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAutoImageUpload}
+                            style={{ display: 'none' }}
+                          />
+                        </label>
+                      </div>
+
+                      {uploadingImage && (
+                        <div style={{ color: '#0284c7', fontWeight: 'bold', margin: '8px 0', fontSize: '0.85rem', textAlign: 'center' }}>
+                          ⏳ Uploading image from device...
+                        </div>
+                      )}
 
                       {stockForm.imageUrl && (
-                        <div className="image-preview-wrapper">
-                          <span className="image-preview-label">Image preview</span>
+                        <div className="image-preview-wrapper" style={{ margin: '10px 0', textAlign: 'center' }}>
+                          <span className="image-preview-label">Image attached</span>
                           <img 
                             src={stockForm.imageUrl} 
                             alt="Preview" 
                             className="image-preview"
+                            style={{ maxHeight: '160px', width: 'auto', borderRadius: '8px', objectFit: 'cover', display: 'block', margin: '8px auto 0' }}
                             onError={(e) => {
                               e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23e5ddd5" width="200" height="200"/%3E%3Ctext x="50%" y="50%" font-size="16" fill="%236b7280" text-anchor="middle" dy=".3em"%3EImage failed to load%3C/text%3E%3C/svg%3E';
                             }}
@@ -948,17 +1263,15 @@ function App() {
                         </div>
                       )}
 
-                      <label>
-                        Upload image to Supabase bucket
+                      <details style={{ margin: '8px 0', color: '#64748b', fontSize: '0.8rem' }}>
+                        <summary style={{ cursor: 'pointer' }}>Advanced: Paste Image URL directly</summary>
                         <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(event) => setImageFile(event.target.files?.[0] || null)}
+                          value={stockForm.imageUrl}
+                          onChange={(event) => setStockForm({ ...stockForm, imageUrl: event.target.value })}
+                          placeholder="https://example.com/image.jpg"
+                          style={{ marginTop: '6px', width: '100%' }}
                         />
-                      </label>
-                      <button type="button" className="ghost-btn" onClick={handleImageUpload}>
-                        Upload image to Supabase Storage
-                      </button>
+                      </details>
                       <div className="double-field">
                         <label>
                           Quantity
@@ -1138,6 +1451,13 @@ function App() {
                             >
                               Edit
                             </button>
+                            <button
+                              type="button"
+                              className="danger-btn small"
+                              onClick={() => handleDeleteItem(item.id)}
+                            >
+                              Delete
+                            </button>
                           </div>
                         </li>
                       ))}
@@ -1214,52 +1534,7 @@ function App() {
                 {adminSection === 'order' && (
                   <div className="panel inventory-manager">
                     <h3>{editingOrderId ? 'Edit Purchase Order' : 'Add Purchase Order'}</h3>
-                    <form className="mini-form" onSubmit={(event) => {
-                      event.preventDefault();
-                      if (!purchaseForm.itemId || !purchaseForm.supplierId) return;
-
-                      const item = inventory.find((entry) => String(entry.id) === String(purchaseForm.itemId));
-                      const supplier = suppliers.find((entry) => String(entry.id) === String(purchaseForm.supplierId));
-
-                      const nextOrder = {
-                        id: editingOrderId || Date.now(),
-                        supplierId: purchaseForm.supplierId,
-                        supplierName: supplier ? supplier.name : 'Unknown supplier',
-                        itemId: purchaseForm.itemId,
-                        itemName: item ? item.name : 'Unknown item',
-                        quantity: Number(purchaseForm.quantity) || 0,
-                        unitCost: Number(purchaseForm.unitCost) || 0,
-                        orderDate: purchaseForm.orderDate,
-                        status: purchaseForm.status,
-                      };
-
-                      setPurchaseOrders((previous) => {
-                        if (editingOrderId) {
-                          return previous.map((order) => order.id === editingOrderId ? nextOrder : order);
-                        }
-                        return [nextOrder, ...previous];
-                      });
-
-                      if (purchaseForm.status === 'Received' && !editingOrderId) {
-                        setInventory((previous) => previous.map((entry) =>
-                          String(entry.id) === String(purchaseForm.itemId)
-                            ? { ...entry, stock: Number(entry.stock) + Number(purchaseForm.quantity || 0) }
-                            : entry
-                        ));
-
-                        setStockMovements((previous) => [{
-                          id: Date.now(),
-                          type: 'Stock In',
-                          itemName: item ? `${item.brand} ${item.name}` : 'Unknown item',
-                          quantity: Number(purchaseForm.quantity) || 0,
-                          date: purchaseForm.orderDate,
-                          note: 'Purchase order received',
-                        }, ...previous]);
-                      }
-
-                      setPurchaseForm(emptyPurchaseForm);
-                      setEditingOrderId(null);
-                    }}>
+                    <form className="mini-form" onSubmit={handlePurchaseOrderSubmit}>
                       <label>
                         Supplier
                         <select
@@ -1483,6 +1758,7 @@ function App() {
                           <button type="button" className="ghost-btn" onClick={() => { setEditingExpenseId(null); setExpenseForm(emptyExpenseForm); }}>Cancel</button>
                         )}
                       </div>
+                      {statusMessage && <p className="status-message">{statusMessage}</p>}
                     </form>
 
                     <div className="panel inventory-manager">
@@ -1599,6 +1875,72 @@ function App() {
           </>
         )}
       </main>
+
+      {zoomedImage && (
+        <div 
+          className="image-lightbox-overlay"
+          onClick={() => setZoomedImage(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px',
+            cursor: 'zoom-out',
+          }}
+        >
+          <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
+            <img 
+              src={zoomedImage.url} 
+              alt={zoomedImage.title}
+              style={{
+                maxWidth: '100%',
+                maxHeight: '82vh',
+                borderRadius: '12px',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                objectFit: 'contain',
+                background: 'white',
+              }}
+            />
+            <div style={{
+              marginTop: '12px',
+              color: 'white',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              fontSize: '1.1rem',
+            }}>
+              {zoomedImage.title}
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setZoomedImage(null)}
+              style={{
+                position: 'absolute',
+                top: '-15px',
+                right: '-15px',
+                background: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                fontWeight: 'bold',
+                fontSize: '1rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

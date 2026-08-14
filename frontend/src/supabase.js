@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+
 export const demoInventory = [
   {
     id: 1,
@@ -120,7 +121,7 @@ export const demoSettings = {
   storageBucket: '',
 };
 
-const normalizeSettings = (record = {}) => ({
+export const normalizeSettings = (record = {}) => ({
   businessName: record.business_name ?? record.businessName ?? 'AutoSpare Pro',
   currency: record.currency ?? 'KES',
   deliveryAllowance: Number(record.delivery_allowance ?? record.deliveryAllowance ?? 500),
@@ -130,8 +131,7 @@ const normalizeSettings = (record = {}) => ({
   storageBucket: record.storage_bucket ?? record.storageBucket ?? record.firebase_bucket ?? record.firebaseBucket ?? '',
 });
 
-const normalizeSparePart = (record = {}) => ({
-  ...record,
+export const normalizeSparePart = (record = {}) => ({
   id: record.id,
   name: record.name ?? '',
   category: record.category ?? 'Engine Parts',
@@ -139,14 +139,56 @@ const normalizeSparePart = (record = {}) => ({
   model: record.model ?? '',
   supplier: record.supplier ?? '',
   imageUrl: record.image_url ?? record.imageUrl ?? '',
-  imageBucket: record.image_bucket ?? record.imageBucket ?? '',
+  imageBucket: record.storage_bucket ?? record.image_bucket ?? record.imageUrl ?? '',
   stock: Number(record.stock ?? 0),
   cost: Number(record.cost ?? 0),
   salePrice: Number(record.sale_price ?? record.salePrice ?? 0),
   reorderLevel: Number(record.reorder_level ?? record.reorderLevel ?? 0),
 });
 
+export const normalizeSale = (record = {}) => ({
+  id: record.id,
+  item: record.item ?? '',
+  amount: Number(record.amount ?? 0),
+  date: record.date ?? '',
+});
 
+export const normalizeExpense = (record = {}) => ({
+  id: record.id,
+  type: record.type ?? '',
+  amount: Number(record.amount ?? 0),
+  note: record.note ?? '',
+  date: record.date ?? '',
+});
+
+export const normalizeSupplier = (record = {}) => ({
+  id: record.id,
+  name: record.name ?? '',
+  contact: record.contact ?? '',
+  phone: record.phone ?? '',
+  email: record.email ?? '',
+});
+
+export const normalizePurchaseOrder = (record = {}) => ({
+  id: record.id,
+  supplierId: record.supplier_id ?? record.supplierId ?? null,
+  supplierName: record.supplier_name ?? record.supplierName ?? '',
+  itemId: record.item_id ?? record.itemId ?? null,
+  itemName: record.item_name ?? record.itemName ?? '',
+  quantity: Number(record.quantity ?? 1),
+  unitCost: Number(record.unit_cost ?? record.unitCost ?? 0),
+  orderDate: record.order_date ?? record.orderDate ?? '',
+  status: record.status ?? 'Pending',
+});
+
+export const normalizeStockMovement = (record = {}) => ({
+  id: record.id,
+  type: record.type ?? '',
+  itemName: record.item_name ?? record.itemName ?? '',
+  quantity: Number(record.quantity ?? 0),
+  date: record.date ?? '',
+  note: record.note ?? '',
+});
 
 export const getSupabaseClient = () => {
   const url = process.env.REACT_APP_SUPABASE_URL;
@@ -154,28 +196,28 @@ export const getSupabaseClient = () => {
 
   if (!url || !anonKey) {
     console.error('❌ Supabase environment variables are missing.');
-    console.error('URL:', url);
-    console.error('Anon key exists:', !!anonKey);
     return null;
   }
 
   return createClient(url, anonKey);
 };
+
 export async function loginAdmin(email, password) {
   const supabase = getSupabaseClient();
 
-  if (!supabase || !supabase.auth || !supabase.auth.signInWithPassword) {
-    return { success: true, email: email || '', mode: 'demo' };
+  if (!supabase || !supabase.auth) {
+    return { success: false, error: 'Supabase client unavailable.', mode: 'demo' };
   }
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: (email || '').trim(),
+      password: password || '',
+    });
     if (error) throw error;
-
-    return { success: true, email: data.user.email, mode: 'supabase' };
+    return { success: true, email: data.user?.email || email, mode: 'supabase' };
   } catch (error) {
-    console.warn('Admin login failed:', error.message);
+    console.warn('Supabase Auth login failed:', error.message);
     return { success: false, error: error.message, mode: 'supabase' };
   }
 }
@@ -184,7 +226,7 @@ export async function uploadSparePartImage(file, partId) {
   if (!file) return { success: false, error: 'No image selected.' };
 
   const supabase = getSupabaseClient();
-  const bucketName = (process.env.REACT_APP_SUPABASE_STORAGE_BUCKET || '').trim();
+  const bucketName = (process.env.REACT_APP_SUPABASE_STORAGE_BUCKET || 'spares').trim();
 
   if (!supabase || !supabase.storage || !bucketName) {
     return { success: false, error: 'Supabase Storage not configured.' };
@@ -199,7 +241,6 @@ export async function uploadSparePartImage(file, partId) {
     const { data } = supabase.storage.from(bucketName).getPublicUrl(fileName);
     const publicUrl = data?.publicUrl || '';
 
-    // ✅ Save URL directly into the database
     if (partId) {
       await supabase.from('spares').update({ image_url: publicUrl }).eq('id', partId);
     }
@@ -230,37 +271,36 @@ export async function loadDashboardData() {
 
   try {
     const [inventoryRes, salesRes, expensesRes, suppliersRes, purchaseOrdersRes, stockMovementsRes, settingsRes] = await Promise.all([
-      supabase.from('spares').select('*'),
-      supabase.from('sales').select('*'),
-      supabase.from('expenses').select('*'),
-      supabase.from('suppliers').select('*'),
-      supabase.from('purchase_orders').select('*'),
-      supabase.from('stock_movements').select('*'),
+      supabase.from('spares').select('*').order('id', { ascending: false }),
+      supabase.from('sales').select('*').order('id', { ascending: false }),
+      supabase.from('expenses').select('*').order('id', { ascending: false }),
+      supabase.from('suppliers').select('*').order('id', { ascending: false }),
+      supabase.from('purchase_orders').select('*').order('id', { ascending: false }),
+      supabase.from('stock_movements').select('*').order('id', { ascending: false }),
       supabase.from('settings').select('*').maybeSingle(),
     ]);
 
-    if (inventoryRes.error) throw inventoryRes.error;
-    if (salesRes.error) throw salesRes.error;
-    if (expensesRes.error) throw expensesRes.error;
-    if (suppliersRes.error) throw suppliersRes.error;
-    if (purchaseOrdersRes.error) throw purchaseOrdersRes.error;
-    if (stockMovementsRes.error) throw stockMovementsRes.error;
-    if (settingsRes.error && settingsRes.error.code !== 'PGRST116') throw settingsRes.error;
+    if (inventoryRes.error) console.warn('Supabase spares table warning:', inventoryRes.error.message);
+    if (salesRes.error) console.warn('Supabase sales table warning:', salesRes.error.message);
+    if (expensesRes.error) console.warn('Supabase expenses table warning:', expensesRes.error.message);
+    if (suppliersRes.error) console.warn('Supabase suppliers table warning:', suppliersRes.error.message);
+    if (purchaseOrdersRes.error) console.warn('Supabase purchase_orders table warning:', purchaseOrdersRes.error.message);
+    if (stockMovementsRes.error) console.warn('Supabase stock_movements table warning:', stockMovementsRes.error.message);
 
     return {
       data: {
-        inventory: inventoryRes.data?.length ? inventoryRes.data.map(normalizeSparePart) : demoInventory,
-        sales: salesRes.data?.length ? salesRes.data : demoSales,
-        expenses: expensesRes.data?.length ? expensesRes.data : demoExpenses,
-        suppliers: suppliersRes.data?.length ? suppliersRes.data : demoSuppliers,
-        purchaseOrders: purchaseOrdersRes.data?.length ? purchaseOrdersRes.data : demoPurchaseOrders,
-        stockMovements: stockMovementsRes.data?.length ? stockMovementsRes.data : demoStockMovements,
+        inventory: inventoryRes.data ? inventoryRes.data.map(normalizeSparePart) : [],
+        sales: salesRes.data ? salesRes.data.map(normalizeSale) : [],
+        expenses: expensesRes.data ? expensesRes.data.map(normalizeExpense) : [],
+        suppliers: suppliersRes.data ? suppliersRes.data.map(normalizeSupplier) : [],
+        purchaseOrders: purchaseOrdersRes.data ? purchaseOrdersRes.data.map(normalizePurchaseOrder) : [],
+        stockMovements: stockMovementsRes.data ? stockMovementsRes.data.map(normalizeStockMovement) : [],
         settings: normalizeSettings(settingsRes.data || demoSettings),
       },
       enabled: true,
     };
   } catch (error) {
-    console.warn('Supabase fallback activated:', error.message);
+    console.warn('Supabase data load error:', error.message);
     return {
       data: {
         inventory: demoInventory,
@@ -271,17 +311,15 @@ export async function loadDashboardData() {
         stockMovements: demoStockMovements,
         settings: demoSettings,
       },
-      enabled: false,
+      enabled: true,
+      error: error.message,
     };
   }
 }
 
 export async function saveAdminSettings(settings) {
   const supabase = getSupabaseClient();
-
-  if (!supabase) {
-    return { success: true, mode: 'demo' };
-  }
+  if (!supabase) return { success: true, mode: 'demo' };
 
   try {
     const payload = {
@@ -296,12 +334,313 @@ export async function saveAdminSettings(settings) {
     };
 
     const { error } = await supabase.from('settings').upsert(payload);
-
     if (error) throw error;
-
     return { success: true, mode: 'supabase' };
   } catch (error) {
     console.warn('Unable to save settings to Supabase:', error.message);
-    return { success: false, mode: 'fallback' };
+    return { success: false, error: error.message, mode: 'fallback' };
+  }
+}
+
+// ----------------------------------------------------
+// CRUD Operations for Production Supabase Backend
+// ----------------------------------------------------
+
+export async function saveSparePart(item) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, mode: 'demo' };
+
+  const payload = {
+    name: item.name,
+    category: item.category,
+    brand: item.brand || 'General',
+    model: item.model || '',
+    supplier: item.supplier || '',
+    image_url: item.imageUrl || '',
+    stock: Number(item.stock || 0),
+    cost: Number(item.cost || 0),
+    sale_price: Number(item.salePrice || 0),
+    reorder_level: Number(item.reorderLevel || 0),
+  };
+
+  try {
+    let result;
+    // Check if ID is a valid DB primary key (numeric) or a temporary Date.now() ID
+    if (item.id && typeof item.id === 'number' && item.id < 10000000000) {
+      result = await supabase.from('spares').update(payload).eq('id', item.id).select().single();
+    } else {
+      result = await supabase.from('spares').insert([payload]).select().single();
+    }
+
+    if (result.error) throw result.error;
+    return { success: true, data: normalizeSparePart(result.data) };
+  } catch (error) {
+    console.error('Error saving spare part to Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteSparePart(id) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, mode: 'demo' };
+
+  try {
+    const { error } = await supabase.from('spares').delete().eq('id', id);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting spare part from Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function saveSale(sale) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, mode: 'demo' };
+
+  const payload = {
+    item: sale.item,
+    amount: Number(sale.amount || 0),
+    date: sale.date,
+  };
+
+  try {
+    let result;
+    if (sale.id && typeof sale.id === 'number' && sale.id < 10000000000) {
+      result = await supabase.from('sales').update(payload).eq('id', sale.id).select().single();
+    } else {
+      result = await supabase.from('sales').insert([payload]).select().single();
+    }
+
+    if (result.error && (result.error.message?.includes('date') || result.error.code === 'PGRST204')) {
+      const fallbackPayload = { item: sale.item, amount: Number(sale.amount || 0) };
+      if (sale.id && typeof sale.id === 'number' && sale.id < 10000000000) {
+        result = await supabase.from('sales').update(fallbackPayload).eq('id', sale.id).select().single();
+      } else {
+        result = await supabase.from('sales').insert([fallbackPayload]).select().single();
+      }
+    }
+
+    if (result.error) throw result.error;
+    return { success: true, data: normalizeSale(result.data) };
+  } catch (error) {
+    console.error('Error saving sale to Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteSale(id) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, mode: 'demo' };
+
+  try {
+    const { error } = await supabase.from('sales').delete().eq('id', id);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting sale from Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function saveExpense(expense) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, mode: 'demo' };
+
+  const payload = {
+    type: expense.type,
+    amount: Number(expense.amount || 0),
+    note: expense.note || '',
+    date: expense.date,
+  };
+
+  try {
+    let result;
+    if (expense.id && typeof expense.id === 'number' && expense.id < 10000000000) {
+      result = await supabase.from('expenses').update(payload).eq('id', expense.id).select().single();
+    } else {
+      result = await supabase.from('expenses').insert([payload]).select().single();
+    }
+
+    if (result.error && (result.error.message?.includes('date') || result.error.code === 'PGRST204')) {
+      const fallbackPayload = {
+        type: expense.type,
+        amount: Number(expense.amount || 0),
+        note: expense.note || '',
+      };
+      if (expense.id && typeof expense.id === 'number' && expense.id < 10000000000) {
+        result = await supabase.from('expenses').update(fallbackPayload).eq('id', expense.id).select().single();
+      } else {
+        result = await supabase.from('expenses').insert([fallbackPayload]).select().single();
+      }
+    }
+
+    if (result.error) throw result.error;
+    return { success: true, data: normalizeExpense(result.data) };
+  } catch (error) {
+    console.error('Error saving expense to Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteExpense(id) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, mode: 'demo' };
+
+  try {
+    const { error } = await supabase.from('expenses').delete().eq('id', id);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting expense from Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function saveSupplier(supplier) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, mode: 'demo' };
+
+  const payload = {
+    name: supplier.name,
+    contact: supplier.contact || '',
+    phone: supplier.phone || '',
+    email: supplier.email || '',
+  };
+
+  try {
+    let result;
+    if (supplier.id && typeof supplier.id === 'number' && supplier.id < 10000000000) {
+      result = await supabase.from('suppliers').update(payload).eq('id', supplier.id).select().single();
+    } else {
+      result = await supabase.from('suppliers').insert([payload]).select().single();
+    }
+
+    if (result.error) throw result.error;
+    return { success: true, data: normalizeSupplier(result.data) };
+  } catch (error) {
+    console.error('Error saving supplier to Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteSupplier(id) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, mode: 'demo' };
+
+  try {
+    const { error } = await supabase.from('suppliers').delete().eq('id', id);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting supplier from Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function savePurchaseOrder(order) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, mode: 'demo' };
+
+  const payload = {
+    supplier_id: order.supplierId ? Number(order.supplierId) : null,
+    supplier_name: order.supplierName || '',
+    item_id: order.itemId ? Number(order.itemId) : null,
+    item_name: order.itemName || '',
+    quantity: Number(order.quantity || 1),
+    unit_cost: Number(order.unitCost || 0),
+    order_date: order.orderDate,
+    status: order.status || 'Pending',
+  };
+
+  try {
+    let result;
+    if (order.id && typeof order.id === 'number' && order.id < 10000000000) {
+      result = await supabase.from('purchase_orders').update(payload).eq('id', order.id).select().single();
+    } else {
+      result = await supabase.from('purchase_orders').insert([payload]).select().single();
+    }
+
+    if (result.error) throw result.error;
+    return { success: true, data: normalizePurchaseOrder(result.data) };
+  } catch (error) {
+    console.error('Error saving purchase order to Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deletePurchaseOrder(id) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, mode: 'demo' };
+
+  try {
+    const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting purchase order from Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function saveStockMovement(movement) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, mode: 'demo' };
+
+  const payload = {
+    type: movement.type,
+    item_name: movement.itemName,
+    quantity: Number(movement.quantity || 0),
+    date: movement.date,
+    note: movement.note || '',
+  };
+
+  try {
+    const { data, error } = await supabase.from('stock_movements').insert([payload]).select().single();
+    if (error) throw error;
+    return { success: true, data: normalizeStockMovement(data) };
+  } catch (error) {
+    console.error('Error saving stock movement to Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateSparePartStock(id, newStock) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, mode: 'demo' };
+
+  try {
+    const { data, error } = await supabase
+      .from('spares')
+      .update({ stock: Math.max(0, Number(newStock)) })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { success: true, data: normalizeSparePart(data) };
+  } catch (error) {
+    console.error('Error updating spare part stock in Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateSparePartPrices(id, cost, salePrice) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, mode: 'demo' };
+
+  try {
+    const { data, error } = await supabase
+      .from('spares')
+      .update({ cost: Number(cost), sale_price: Number(salePrice) })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { success: true, data: normalizeSparePart(data) };
+  } catch (error) {
+    console.error('Error updating spare part prices in Supabase:', error);
+    return { success: false, error: error.message };
   }
 }
