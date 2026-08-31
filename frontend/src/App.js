@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import {
   SHOPS,
@@ -179,6 +179,11 @@ function App() {
   const [costQuery, setCostQuery] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [zoomedImage, setZoomedImage] = useState(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const [cameraError, setCameraError] = useState('');
+  const videoRef = useRef(null);
+  const cameraStreamRef = useRef(null);
 
   const applyDataBundle = (bundle) => {
     const nextSettings = {
@@ -530,12 +535,11 @@ function App() {
     });
   };
 
-  const handleAutoImageUpload = async (event) => {
-    const file = event.target.files?.[0];
+  const processImageFile = async (file) => {
     if (!file) return;
 
     setUploadingImage(true);
-    setStatusMessage('⚡ Resizing & compressing image from device...');
+    setStatusMessage('⚡ Resizing & compressing image...');
 
     const { blob: resizedFile, dataUrl } = await resizeImageFile(file, 1000, 1000, 0.85);
 
@@ -556,6 +560,84 @@ function App() {
       setStatusMessage('Error uploading image.');
     }
     setUploadingImage(false);
+  };
+
+  const handleAutoImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    await processImageFile(file);
+  };
+
+  const stopCameraStream = () => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    }
+  };
+
+  const handleOpenCamera = async () => {
+    setCameraError('');
+    setCapturedPhoto(null);
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError('Camera access is not supported on this device or browser.');
+      setShowCamera(true);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      setShowCamera(true);
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      });
+    } catch (error) {
+      setCameraError('Could not access the camera. Check permissions and try again.');
+      setShowCamera(true);
+    }
+  };
+
+  const handleCloseCamera = () => {
+    stopCameraStream();
+    setShowCamera(false);
+    setCapturedPhoto(null);
+    setCameraError('');
+  };
+
+  const handleCapturePhoto = () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    setCapturedPhoto(canvas.toDataURL('image/jpeg', 0.92));
+  };
+
+  const handleRetakePhoto = () => {
+    setCapturedPhoto(null);
+  };
+
+  const handleUsePhoto = async () => {
+    if (!capturedPhoto) return;
+
+    const response = await fetch(capturedPhoto);
+    const blob = await response.blob();
+    const file = new File([blob], `spare-part-${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+    stopCameraStream();
+    setShowCamera(false);
+    setCapturedPhoto(null);
+    await processImageFile(file);
   };
 
   const handleAddStock = async (event) => {
@@ -1465,30 +1547,54 @@ function App() {
                           onChange={(event) => setStockForm({ ...stockForm, supplier: event.target.value })}
                         />
                       </label>
-                      <div className="file-upload-box" style={{
-                        background: '#f8fafc',
-                        border: '2px dashed #cbd5e1',
-                        borderRadius: '12px',
-                        padding: '16px',
-                        margin: '12px 0',
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                      }}>
-                        <label style={{ cursor: 'pointer', display: 'block' }}>
-                          <div style={{ fontSize: '1.8rem', marginBottom: '4px' }}>📷</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', margin: '12px 0' }}>
+                        <div className="file-upload-box" style={{
+                          background: '#f8fafc',
+                          border: '2px dashed #cbd5e1',
+                          borderRadius: '12px',
+                          padding: '16px',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                        }}>
+                          <label style={{ cursor: 'pointer', display: 'block' }}>
+                            <div style={{ fontSize: '1.8rem', marginBottom: '4px' }}>📷</div>
+                            <strong style={{ color: '#1e293b', fontSize: '0.95rem' }}>
+                              Choose from gallery
+                            </strong>
+                            <small style={{ display: 'block', color: '#64748b', marginTop: '2px' }}>
+                              Uploads & attaches automatically
+                            </small>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleAutoImageUpload}
+                              style={{ display: 'none' }}
+                            />
+                          </label>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleOpenCamera}
+                          className="file-upload-box"
+                          style={{
+                            background: '#fef7f2',
+                            border: '2px dashed #d97706',
+                            borderRadius: '12px',
+                            padding: '16px',
+                            textAlign: 'center',
+                            cursor: 'pointer',
+                            font: 'inherit',
+                          }}
+                        >
+                          <div style={{ fontSize: '1.8rem', marginBottom: '4px' }}>📸</div>
                           <strong style={{ color: '#1e293b', fontSize: '0.95rem' }}>
-                            Choose image from your device
+                            Take a photo
                           </strong>
                           <small style={{ display: 'block', color: '#64748b', marginTop: '2px' }}>
-                            Image uploads & attaches automatically
+                            Use your camera live
                           </small>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleAutoImageUpload}
-                            style={{ display: 'none' }}
-                          />
-                        </label>
+                        </button>
                       </div>
 
                       {uploadingImage && (
@@ -2124,6 +2230,99 @@ function App() {
           </>
         )}
       </main>
+
+      {showCamera && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px',
+          }}
+        >
+          <div style={{
+            position: 'relative',
+            width: '100%',
+            maxWidth: '520px',
+            background: '#111827',
+            borderRadius: '18px',
+            overflow: 'hidden',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '14px 18px',
+              color: 'white',
+            }}>
+              <strong>📸 Take a photo</strong>
+              <button
+                type="button"
+                onClick={handleCloseCamera}
+                style={{
+                  background: 'rgba(255,255,255,0.12)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {cameraError ? (
+              <div style={{ padding: '40px 24px', textAlign: 'center', color: '#fecaca' }}>
+                {cameraError}
+              </div>
+            ) : (
+              <div style={{ position: 'relative', background: 'black', aspectRatio: '4 / 3' }}>
+                {capturedPhoto ? (
+                  <img
+                    src={capturedPhoto}
+                    alt="Captured spare part"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
+                ) : (
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                )}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', padding: '16px 18px', justifyContent: 'center' }}>
+              {cameraError ? (
+                <button type="button" className="ghost-btn" onClick={handleCloseCamera}>Close</button>
+              ) : capturedPhoto ? (
+                <>
+                  <button type="button" className="ghost-btn" onClick={handleRetakePhoto}>Retake</button>
+                  <button type="button" className="primary-btn" onClick={handleUsePhoto}>Use this photo</button>
+                </>
+              ) : (
+                <button type="button" className="primary-btn" onClick={handleCapturePhoto}>
+                  ⚪ Capture
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {zoomedImage && (
         <div 
