@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import './App.css';
 import {
+  SHOPS,
+  getShopName,
+  PART_SIDES,
   demoInventory,
   demoSuppliers,
   demoPurchaseOrders,
@@ -28,16 +31,22 @@ import {
   updateSparePartPrices,
 } from './supabase';
 
-const categories = ['All', 'Engine Parts', 'Brake System', 'Electrical', 'Suspension', 'Transmission'];
+const categories = ['All', 'Body', 'Electrical', 'Mechanical'];
+const shopThemes = {
+  velll: { icon: '🏬', accent: '#2563eb', accent2: '#0ea5e9', soft: '#eaf2ff' },
+  bana: { icon: '🏪', accent: '#9333ea', accent2: '#db2777', soft: '#faf0ff' },
+};
+const getShopTheme = (shopId) => shopThemes[shopId] || { icon: '🏪', accent: '#c85a3a', accent2: '#d97706', soft: '#fef0e6' };
 const expenseTypes = ['Installation Labour', 'Motorbike Delivery', 'Part Reordering', 'Workshop Rent', 'Utilities'];
 
 const makeToday = () => new Date().toISOString().slice(0, 10);
 
 const emptyStockForm = {
   name: '',
-  category: 'Engine Parts',
+  category: 'Mechanical',
   brand: 'Toyota',
   model: '',
+  side: 'N/A',
   supplier: '',
   imageUrl: '',
   stock: 1,
@@ -88,6 +97,16 @@ const emptyCostForm = {
 };
 
 const demoDataKey = 'autospares-demo-data-v1';
+const selectedShopKey = 'autospares-selected-shop-v1';
+
+const getSavedShop = () => {
+  try {
+    const raw = localStorage.getItem(selectedShopKey);
+    return raw && SHOPS.some((shop) => shop.id === raw) ? raw : null;
+  } catch (error) {
+    return null;
+  }
+};
 
 const getSavedDemoData = () => {
   try {
@@ -117,12 +136,14 @@ const buildDemoBundle = (settingsOverride = null) => ({
 });
 
 function App() {
-  const [inventory, setInventory] = useState([]);
-  const [sales, setSales] = useState([]);
-  const [expenses, setExpenses] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [purchaseOrders, setPurchaseOrders] = useState([]);
-  const [stockMovements, setStockMovements] = useState([]);
+  const [allInventory, setAllInventory] = useState([]);
+  const [allSales, setAllSales] = useState([]);
+  const [allExpenses, setAllExpenses] = useState([]);
+  const [allSuppliers, setAllSuppliers] = useState([]);
+  const [allPurchaseOrders, setAllPurchaseOrders] = useState([]);
+  const [allStockMovements, setAllStockMovements] = useState([]);
+  const [selectedShop, setSelectedShop] = useState(() => getSavedShop());
+  const [showAdminLoginFromGate, setShowAdminLoginFromGate] = useState(false);
   const [settings, setSettings] = useState({
     businessName: 'AutoSpare Pro',
     currency: 'KES',
@@ -171,12 +192,12 @@ function App() {
     const nextPurchaseOrders = Array.isArray(bundle?.purchaseOrders) ? bundle.purchaseOrders : [];
     const nextStockMovements = Array.isArray(bundle?.stockMovements) ? bundle.stockMovements : [];
 
-    setInventory(nextInventory);
-    setSales(nextSales);
-    setExpenses(nextExpenses);
-    setSuppliers(nextSuppliers);
-    setPurchaseOrders(nextPurchaseOrders);
-    setStockMovements(nextStockMovements);
+    setAllInventory(nextInventory);
+    setAllSales(nextSales);
+    setAllExpenses(nextExpenses);
+    setAllSuppliers(nextSuppliers);
+    setAllPurchaseOrders(nextPurchaseOrders);
+    setAllStockMovements(nextStockMovements);
     setSettings(nextSettings);
     setAdminForm(nextSettings);
     saveDemoData({
@@ -188,6 +209,49 @@ function App() {
       stockMovements: nextStockMovements,
       settings: nextSettings,
     });
+  };
+
+  const inventory = useMemo(
+    () => allInventory.filter((item) => item.shop === selectedShop),
+    [allInventory, selectedShop]
+  );
+  const sales = useMemo(
+    () => allSales.filter((sale) => sale.shop === selectedShop),
+    [allSales, selectedShop]
+  );
+  const expenses = useMemo(
+    () => allExpenses.filter((expense) => expense.shop === selectedShop),
+    [allExpenses, selectedShop]
+  );
+  const suppliers = useMemo(
+    () => allSuppliers.filter((supplier) => supplier.shop === selectedShop),
+    [allSuppliers, selectedShop]
+  );
+  const purchaseOrders = useMemo(
+    () => allPurchaseOrders.filter((order) => order.shop === selectedShop),
+    [allPurchaseOrders, selectedShop]
+  );
+  const stockMovements = useMemo(
+    () => allStockMovements.filter((movement) => movement.shop === selectedShop),
+    [allStockMovements, selectedShop]
+  );
+
+  const handleSelectShop = (shopId) => {
+    setSelectedShop(shopId);
+    try {
+      localStorage.setItem(selectedShopKey, shopId);
+    } catch (error) {
+      console.warn('Unable to remember selected shop:', error.message);
+    }
+  };
+
+  const handleSwitchShop = () => {
+    setSelectedShop(null);
+    try {
+      localStorage.removeItem(selectedShopKey);
+    } catch (error) {
+      console.warn('Unable to clear remembered shop:', error.message);
+    }
   };
 
   useEffect(() => {
@@ -216,6 +280,7 @@ function App() {
     };
 
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filteredInventory = useMemo(() => {
@@ -234,9 +299,10 @@ function App() {
 
   const totalSales = sales.reduce((sum, sale) => sum + Number(sale.amount || 0), 0);
   const totalExpenses = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
-  const totalCostOfGoods = inventory.reduce((sum, item) => sum + (Number(item.cost || 0) * Number(item.stock || 0)), 0);
+  const totalCostOfGoodsSold = sales.reduce((sum, sale) => sum + (Number(sale.cost || 0) * Number(sale.quantity || 1)), 0);
+  const grossProfit = totalSales - totalCostOfGoodsSold;
 
-  const profitAndLoss = totalSales - totalExpenses - totalCostOfGoods;
+  const profitAndLoss = grossProfit - totalExpenses;
   const lowStockItems = inventory.filter((item) => Number(item.stock) <= Number(item.reorderLevel || settings.minimumStockAlert));
 
   const filteredSuppliers = suppliers.filter((supplier) => {
@@ -280,6 +346,7 @@ function App() {
         return;
       }
       await saveStockMovement({
+        shop: selectedShop,
         type: 'Price Adjustment',
         itemName: `${item.brand} ${item.name}`,
         quantity: 0,
@@ -288,15 +355,16 @@ function App() {
       });
     }
 
-    setInventory((previous) =>
+    setAllInventory((previous) =>
       previous.map((entry) =>
         String(entry.id) === String(costForm.itemId) ? { ...entry, cost: newCost, salePrice: newSalePrice } : entry
       )
     );
 
-    setStockMovements((previous) => [
+    setAllStockMovements((previous) => [
       {
         id: Date.now(),
+        shop: selectedShop,
         type: 'Price Adjustment',
         itemName: `${item.brand} ${item.name}`,
         quantity: 0,
@@ -351,6 +419,7 @@ function App() {
 
     if (result.success) {
       setAdminAuthenticated(true);
+      setShowAdminLoginFromGate(false);
       setStatusMessage(`Admin access granted (${result.email}).`);
     } else {
       setAdminAuthenticated(false);
@@ -358,25 +427,47 @@ function App() {
     }
   };
 
+  const persistAllData = (bundle) => {
+    setAllInventory(bundle.inventory);
+    setAllSales(bundle.sales);
+    setAllExpenses(bundle.expenses);
+    setAllSuppliers(bundle.suppliers);
+    setAllPurchaseOrders(bundle.purchaseOrders);
+    setAllStockMovements(bundle.stockMovements);
+    saveDemoData({ ...bundle, settings });
+  };
+
   const handleLoadDemoData = () => {
-    applyDataBundle(buildDemoBundle(settings));
-    setStatusMessage('Demo data restored.');
+    const shopDemoBundle = buildDemoBundle(settings);
+    const belongsToOtherShop = (record) => record.shop !== selectedShop;
+    const belongsToThisShop = (record) => record.shop === selectedShop;
+
+    persistAllData({
+      inventory: [...allInventory.filter(belongsToOtherShop), ...shopDemoBundle.inventory.filter(belongsToThisShop)],
+      sales: [...allSales.filter(belongsToOtherShop), ...shopDemoBundle.sales.filter(belongsToThisShop)],
+      expenses: [...allExpenses.filter(belongsToOtherShop), ...shopDemoBundle.expenses.filter(belongsToThisShop)],
+      suppliers: [...allSuppliers.filter(belongsToOtherShop), ...shopDemoBundle.suppliers.filter(belongsToThisShop)],
+      purchaseOrders: [...allPurchaseOrders.filter(belongsToOtherShop), ...shopDemoBundle.purchaseOrders.filter(belongsToThisShop)],
+      stockMovements: [...allStockMovements.filter(belongsToOtherShop), ...shopDemoBundle.stockMovements.filter(belongsToThisShop)],
+    });
+    setStatusMessage(`Demo data restored for ${getShopName(selectedShop)}.`);
   };
 
   const handleClearAllData = () => {
-    const shouldClear = window.confirm('Clear all data and start with an empty stock list?');
+    const shouldClear = window.confirm(`Clear all data for ${getShopName(selectedShop)}? The other shop's data is kept.`);
     if (!shouldClear) return;
 
-    applyDataBundle({
-      inventory: [],
-      sales: [],
-      expenses: [],
-      suppliers: [],
-      purchaseOrders: [],
-      stockMovements: [],
-      settings: { ...settings },
+    const belongsToOtherShop = (record) => record.shop !== selectedShop;
+
+    persistAllData({
+      inventory: allInventory.filter(belongsToOtherShop),
+      sales: allSales.filter(belongsToOtherShop),
+      expenses: allExpenses.filter(belongsToOtherShop),
+      suppliers: allSuppliers.filter(belongsToOtherShop),
+      purchaseOrders: allPurchaseOrders.filter(belongsToOtherShop),
+      stockMovements: allStockMovements.filter(belongsToOtherShop),
     });
-    setStatusMessage('All data cleared. Dashboard is now empty.');
+    setStatusMessage(`All data cleared for ${getShopName(selectedShop)}.`);
   };
 
   const resizeImageFile = (file, maxWidth = 1000, maxHeight = 1000, quality = 0.85) => {
@@ -462,10 +553,12 @@ function App() {
 
     const imageUrlValue = stockForm.imageUrl?.trim() || '';
     const submittedItem = {
+      shop: selectedShop,
       name: stockForm.name.trim(),
       category: stockForm.category,
       brand: stockForm.brand.trim() || 'General',
       model: stockForm.model.trim(),
+      side: stockForm.side || 'N/A',
       supplier: stockForm.supplier.trim(),
       imageUrl: imageUrlValue,
       stock: Number(stockForm.stock) || 0,
@@ -488,6 +581,7 @@ function App() {
       }
 
       await saveStockMovement({
+        shop: selectedShop,
         type: 'Stock In',
         itemName: `${submittedItem.brand} ${submittedItem.name}`,
         quantity: Number(submittedItem.stock),
@@ -497,18 +591,19 @@ function App() {
     }
 
     if (editingItemId) {
-      setInventory((previous) =>
+      setAllInventory((previous) =>
         previous.map((item) => (String(item.id) === String(editingItemId) ? savedItem : item))
       );
       setStatusMessage('Spare part updated successfully.');
     } else {
-      setInventory((previous) => [savedItem, ...previous]);
+      setAllInventory((previous) => [savedItem, ...previous]);
       setStatusMessage('Spare part added successfully.');
     }
 
-    setStockMovements((previous) => [
+    setAllStockMovements((previous) => [
       {
         id: Date.now(),
+        shop: selectedShop,
         type: 'Stock In',
         itemName: `${submittedItem.brand} ${submittedItem.name}`,
         quantity: Number(submittedItem.stock),
@@ -530,6 +625,7 @@ function App() {
       category: item.category,
       brand: item.brand,
       model: item.model || '',
+      side: item.side || 'N/A',
       supplier: item.supplier || '',
       imageUrl: item.imageUrl || '',
       stock: Number(item.stock) || 0,
@@ -549,7 +645,7 @@ function App() {
         return;
       }
     }
-    setInventory((previous) => previous.filter((item) => String(item.id) !== String(itemId)));
+    setAllInventory((previous) => previous.filter((item) => String(item.id) !== String(itemId)));
     if (String(editingItemId) === String(itemId)) {
       setEditingItemId(null);
       setStockForm(emptyStockForm);
@@ -564,17 +660,21 @@ function App() {
 
     const quantity = Number(saleForm.quantity) || 1;
     const amount = Number(saleForm.amount) || Number(chosenItem.salePrice || 0);
+    const unitCost = Number(chosenItem.cost || 0);
     const saleItemName = `${chosenItem.brand} ${chosenItem.name}`;
 
     let savedSale = {
       id: editingSaleId || Date.now(),
+      shop: selectedShop,
       item: saleItemName,
       amount,
+      quantity,
+      cost: unitCost,
       date: saleForm.date,
     };
 
     if (supabaseEnabled) {
-      const res = await saveSale({ id: editingSaleId, item: saleItemName, amount, date: saleForm.date });
+      const res = await saveSale({ id: editingSaleId, shop: selectedShop, item: saleItemName, amount, quantity, cost: unitCost, date: saleForm.date });
       if (res.success && res.data) {
         savedSale = res.data;
       } else if (!res.success) {
@@ -586,6 +686,7 @@ function App() {
         const newStock = Math.max(0, Number(chosenItem.stock) - quantity);
         await updateSparePartStock(chosenItem.id, newStock);
         await saveStockMovement({
+          shop: selectedShop,
           type: 'Sale',
           itemName: saleItemName,
           quantity: -quantity,
@@ -596,14 +697,14 @@ function App() {
     }
 
     if (editingSaleId) {
-      setSales((previous) => previous.map((sale) =>
+      setAllSales((previous) => previous.map((sale) =>
         String(sale.id) === String(editingSaleId) ? savedSale : sale
       ));
       setStatusMessage('Sale updated successfully.');
     } else {
-      setSales((previous) => [savedSale, ...previous]);
+      setAllSales((previous) => [savedSale, ...previous]);
 
-      setInventory((previous) =>
+      setAllInventory((previous) =>
         previous.map((item) =>
           String(item.id) === String(chosenItem.id)
             ? { ...item, stock: Math.max(0, Number(item.stock) - quantity) }
@@ -611,9 +712,10 @@ function App() {
         )
       );
 
-      setStockMovements((previous) => [
+      setAllStockMovements((previous) => [
         {
           id: Date.now(),
+          shop: selectedShop,
           type: 'Sale',
           itemName: saleItemName,
           quantity: -quantity,
@@ -646,6 +748,7 @@ function App() {
 
     let savedExpense = {
       id: editingExpenseId || Date.now(),
+      shop: selectedShop,
       type: expenseForm.type || 'General Expense',
       amount,
       note: expenseForm.note || 'Manual expense entry',
@@ -655,6 +758,7 @@ function App() {
     if (supabaseEnabled) {
       const res = await saveExpense({
         id: editingExpenseId,
+        shop: selectedShop,
         type: expenseForm.type || 'General Expense',
         amount,
         note: expenseForm.note || 'Manual expense entry',
@@ -669,12 +773,12 @@ function App() {
     }
 
     if (editingExpenseId) {
-      setExpenses((previous) => previous.map((expense) =>
+      setAllExpenses((previous) => previous.map((expense) =>
         String(expense.id) === String(editingExpenseId) ? savedExpense : expense
       ));
       setStatusMessage('✓ Expense updated successfully.');
     } else {
-      setExpenses((previous) => [savedExpense, ...previous]);
+      setAllExpenses((previous) => [savedExpense, ...previous]);
       setStatusMessage('✓ Expense recorded successfully.');
     }
 
@@ -686,10 +790,10 @@ function App() {
     event.preventDefault();
     if (!supplierForm.name.trim()) return;
 
-    let savedSupplier = { ...supplierForm, id: editingSupplierId || Date.now() };
+    let savedSupplier = { ...supplierForm, id: editingSupplierId || Date.now(), shop: selectedShop };
 
     if (supabaseEnabled) {
-      const res = await saveSupplier({ id: editingSupplierId, ...supplierForm });
+      const res = await saveSupplier({ id: editingSupplierId, ...supplierForm, shop: selectedShop });
       if (res.success && res.data) {
         savedSupplier = res.data;
       } else if (!res.success) {
@@ -699,12 +803,12 @@ function App() {
     }
 
     if (editingSupplierId) {
-      setSuppliers((previous) => previous.map((supplier) =>
+      setAllSuppliers((previous) => previous.map((supplier) =>
         String(supplier.id) === String(editingSupplierId) ? savedSupplier : supplier
       ));
       setStatusMessage('Supplier updated successfully.');
     } else {
-      setSuppliers((previous) => [savedSupplier, ...previous]);
+      setAllSuppliers((previous) => [savedSupplier, ...previous]);
       setStatusMessage('Supplier added successfully.');
     }
 
@@ -720,7 +824,7 @@ function App() {
         return;
       }
     }
-    setSuppliers((previous) => previous.filter((supplier) => String(supplier.id) !== String(supplierId)));
+    setAllSuppliers((previous) => previous.filter((supplier) => String(supplier.id) !== String(supplierId)));
     setStatusMessage('Supplier deleted successfully.');
   };
 
@@ -732,6 +836,7 @@ function App() {
     const supplier = suppliers.find((entry) => String(entry.id) === String(purchaseForm.supplierId));
 
     const targetOrder = {
+      shop: selectedShop,
       supplierId: purchaseForm.supplierId,
       supplierName: supplier ? supplier.name : 'Unknown supplier',
       itemId: purchaseForm.itemId,
@@ -757,6 +862,7 @@ function App() {
         const newStock = Number(item.stock) + Number(purchaseForm.quantity || 0);
         await updateSparePartStock(item.id, newStock);
         await saveStockMovement({
+          shop: selectedShop,
           type: 'Stock In',
           itemName: `${item.brand} ${item.name}`,
           quantity: Number(purchaseForm.quantity) || 0,
@@ -766,7 +872,7 @@ function App() {
       }
     }
 
-    setPurchaseOrders((previous) => {
+    setAllPurchaseOrders((previous) => {
       if (editingOrderId) {
         return previous.map((order) => String(order.id) === String(editingOrderId) ? savedOrder : order);
       }
@@ -774,14 +880,15 @@ function App() {
     });
 
     if (purchaseForm.status === 'Received' && !editingOrderId && item) {
-      setInventory((previous) => previous.map((entry) =>
+      setAllInventory((previous) => previous.map((entry) =>
         String(entry.id) === String(purchaseForm.itemId)
           ? { ...entry, stock: Number(entry.stock) + Number(purchaseForm.quantity || 0) }
           : entry
       ));
 
-      setStockMovements((previous) => [{
+      setAllStockMovements((previous) => [{
         id: Date.now(),
+        shop: selectedShop,
         type: 'Stock In',
         itemName: `${item.brand} ${item.name}`,
         quantity: Number(purchaseForm.quantity) || 0,
@@ -803,7 +910,7 @@ function App() {
         return;
       }
     }
-    setPurchaseOrders((previous) => previous.filter((order) => String(order.id) !== String(orderId)));
+    setAllPurchaseOrders((previous) => previous.filter((order) => String(order.id) !== String(orderId)));
     setStatusMessage('Purchase order deleted successfully.');
   };
 
@@ -815,7 +922,7 @@ function App() {
         return;
       }
     }
-    setSales((previous) => previous.filter((sale) => String(sale.id) !== String(saleId)));
+    setAllSales((previous) => previous.filter((sale) => String(sale.id) !== String(saleId)));
     setStatusMessage('Sale deleted successfully.');
   };
 
@@ -827,13 +934,14 @@ function App() {
         return;
       }
     }
-    setExpenses((previous) => previous.filter((expense) => String(expense.id) !== String(expenseId)));
+    setAllExpenses((previous) => previous.filter((expense) => String(expense.id) !== String(expenseId)));
     setStatusMessage('Expense deleted successfully.');
   };
 
   const dashboardCards = adminAuthenticated
     ? [
         { label: 'Total Income', value: `KES ${totalSales.toLocaleString()}` },
+        { label: 'Cost of Goods Sold', value: `KES ${totalCostOfGoodsSold.toLocaleString()}` },
         { label: 'Liabilities', value: `KES ${totalExpenses.toLocaleString()}` },
         { label: 'Stock Units', value: inventory.reduce((sum, item) => sum + Number(item.stock || 0), 0).toLocaleString() },
         { label: 'Profit / Loss', value: `KES ${profitAndLoss.toLocaleString()}` },
@@ -853,8 +961,115 @@ function App() {
 
   const handleAdminLogout = () => {
     setAdminAuthenticated(false);
+    setShowAdminLoginFromGate(false);
+    handleSwitchShop();
     setStatusMessage('Logged out of Admin mode.');
   };
+
+  if (adminAuthenticated && !selectedShop) {
+    return (
+      <div className="shop-gate admin-mode">
+        <div className="shop-gate-card admin-mode">
+          <div className="shop-gate-logo admin-mode">🛠️</div>
+          <p className="eyebrow">Admin Console</p>
+          <h2>Select a shop to manage</h2>
+          <p className="shop-gate-subtitle">
+            Choose which shop's inventory, sales, and reports you want to work with. You can switch shops anytime from the sidebar.
+          </p>
+          <div className="shop-options">
+            {SHOPS.map((shop) => {
+              const theme = getShopTheme(shop.id);
+              return (
+                <button
+                  key={shop.id}
+                  type="button"
+                  className="shop-option-btn"
+                  style={{ '--shop-accent': theme.accent, '--shop-accent-2': theme.accent2, '--shop-soft': theme.soft }}
+                  onClick={() => handleSelectShop(shop.id)}
+                >
+                  <span className="shop-option-icon">{theme.icon}</span>
+                  <span className="shop-option-text">
+                    <strong>{shop.name}</strong>
+                    <small>Manage inventory, sales &amp; reports</small>
+                  </span>
+                  <span className="shop-option-arrow">→</span>
+                </button>
+              );
+            })}
+          </div>
+          <button type="button" className="ghost-btn" onClick={handleAdminLogout}>Logout</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!adminAuthenticated && !selectedShop) {
+    return (
+      <div className="shop-gate">
+        <div className="shop-gate-card">
+          {!showAdminLoginFromGate ? (
+            <>
+              <div className="shop-gate-logo">A</div>
+              <p className="eyebrow">Welcome to</p>
+              <h2>{settings.businessName}</h2>
+              <p className="shop-gate-subtitle">Select a shop to browse available spare parts and live stock.</p>
+              <div className="shop-options">
+                {SHOPS.map((shop) => {
+                  const theme = getShopTheme(shop.id);
+                  return (
+                    <button
+                      key={shop.id}
+                      type="button"
+                      className="shop-option-btn"
+                      style={{ '--shop-accent': theme.accent, '--shop-accent-2': theme.accent2, '--shop-soft': theme.soft }}
+                      onClick={() => handleSelectShop(shop.id)}
+                    >
+                      <span className="shop-option-icon">{theme.icon}</span>
+                      <span className="shop-option-text">
+                        <strong>{shop.name}</strong>
+                        <small>Browse available stock</small>
+                      </span>
+                      <span className="shop-option-arrow">→</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="shop-gate-divider"><span>or</span></div>
+              <button type="button" className="ghost-btn shop-gate-admin-link" onClick={() => setShowAdminLoginFromGate(true)}>
+                🔒 Admin Login
+              </button>
+            </>
+          ) : (
+            <form className="admin-login" onSubmit={handleAdminLogin}>
+              <div className="shop-gate-logo">A</div>
+              <h3>Admin Access</h3>
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={adminLogin.email}
+                  onChange={(event) => setAdminLogin({ ...adminLogin, email: event.target.value })}
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  type="password"
+                  value={adminLogin.password}
+                  onChange={(event) => setAdminLogin({ ...adminLogin, password: event.target.value })}
+                />
+              </label>
+              <div className="button-row">
+                <button type="submit" className="primary-btn">Login</button>
+                <button type="button" className="ghost-btn" onClick={() => setShowAdminLoginFromGate(false)}>Back</button>
+              </div>
+              {statusMessage && <p className="status-message">{statusMessage}</p>}
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -868,13 +1083,21 @@ function App() {
             </div>
           </div>
 
+          <div className="shop-switcher">
+            <div className="shop-switcher-label">
+              <small>Current shop</small>
+              <strong>{getShopTheme(selectedShop).icon} {getShopName(selectedShop)}</strong>
+            </div>
+            <button type="button" className="ghost-btn small" onClick={handleSwitchShop}>Switch shop</button>
+          </div>
+
           <nav className="nav">
             <p className="nav-section-label">Overview</p>
             <button className={activeTab === 'dashboard' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveTab('dashboard')}>
-              Dashboard
+              📊 Dashboard
             </button>
             <button className={activeTab === 'inventory' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveTab('inventory')}>
-              Inventory Catalog
+              📦 Inventory Catalog
             </button>
             <button className={activeTab === 'admin' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveTab('admin')}>
               {adminAuthenticated ? '⚙️ Admin Panel' : '🔒 Admin Login'}
@@ -1073,7 +1296,12 @@ function App() {
                       <span>{item.category}</span>
                       <span className="brand">{item.brand}</span>
                     </div>
-                    <h3>{item.name}</h3>
+                    <h3>
+                      {item.name}
+                      {item.side && item.side !== 'N/A' && (
+                        <span className={`side-badge side-${item.side.toLowerCase()}`}>{item.side}</span>
+                      )}
+                    </h3>
                     <p>{item.model}</p>
                     <div className="supplier-line">Supplier: {item.supplier || 'N/A'}</div>
                     <div className="metrics" style={{ gridTemplateColumns: adminAuthenticated ? 'repeat(3, minmax(0, 1fr))' : 'repeat(2, minmax(0, 1fr))' }}>
@@ -1208,6 +1436,17 @@ function App() {
                           value={stockForm.model}
                           onChange={(event) => setStockForm({ ...stockForm, model: event.target.value })}
                         />
+                      </label>
+                      <label>
+                        Side (for parts like mirrors, headlights, doors)
+                        <select
+                          value={stockForm.side}
+                          onChange={(event) => setStockForm({ ...stockForm, side: event.target.value })}
+                        >
+                          {PART_SIDES.map((side) => (
+                            <option key={side} value={side}>{side}</option>
+                          ))}
+                        </select>
                       </label>
                       <label>
                         Supplier
@@ -1390,7 +1629,7 @@ function App() {
                         >
                           <option value="">Select part</option>
                           {inventory.map((item) => (
-                            <option key={item.id} value={item.id}>{item.brand} {item.name}</option>
+                            <option key={item.id} value={item.id}>{item.brand} {item.name}{item.side && item.side !== 'N/A' ? ` (${item.side})` : ''}</option>
                           ))}
                         </select>
                       </label>
@@ -1430,7 +1669,7 @@ function App() {
                       {filteredInventoryForCost.map((item) => (
                         <li key={item.id}>
                           <div>
-                            <span>{item.brand} {item.name}</span>
+                            <span>{item.brand} {item.name}{item.side && item.side !== 'N/A' ? ` (${item.side})` : ''}</span>
                             <small>{item.category}</small>
                           </div>
                           <div className="mini-actions">
@@ -1555,7 +1794,7 @@ function App() {
                         >
                           <option value="">Select part</option>
                           {inventory.map((item) => (
-                            <option key={item.id} value={item.id}>{item.brand} {item.name}</option>
+                            <option key={item.id} value={item.id}>{item.brand} {item.name}{item.side && item.side !== 'N/A' ? ` (${item.side})` : ''}</option>
                           ))}
                         </select>
                       </label>
@@ -1644,7 +1883,7 @@ function App() {
                         >
                           <option value="">Select spare part</option>
                           {inventory.map((item) => (
-                            <option key={item.id} value={item.id}>{item.brand} {item.name}</option>
+                            <option key={item.id} value={item.id}>{item.brand} {item.name}{item.side && item.side !== 'N/A' ? ` (${item.side})` : ''}</option>
                           ))}
                         </select>
                       </label>
@@ -1703,7 +1942,7 @@ function App() {
                             </div>
                             <div className="mini-actions">
                               <strong>KES {Number(sale.amount).toLocaleString()}</strong>
-                              <button type="button" className="ghost-btn small" onClick={() => { setEditingSaleId(sale.id); setSaleForm({ itemId: inventory.find((item) => item.name === sale.item.split(' ').slice(1).join(' ') || item.name === sale.item)?.id || '', quantity: 1, amount: sale.amount, date: sale.date }); }}>Edit</button>
+                              <button type="button" className="ghost-btn small" onClick={() => { setEditingSaleId(sale.id); setSaleForm({ itemId: inventory.find((item) => item.name === sale.item.split(' ').slice(1).join(' ') || item.name === sale.item)?.id || '', quantity: Number(sale.quantity) || 1, amount: sale.amount, date: sale.date }); }}>Edit</button>
                               <button type="button" className="danger-btn small" onClick={() => handleDeleteSale(sale.id)}>Delete</button>
                             </div>
                           </li>

@@ -8,9 +8,10 @@ html {
 
 body {
   margin: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: #f3f7fb;
-  color: #14213d;
+  font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f6f4f1;
+  color: #1f2937;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,

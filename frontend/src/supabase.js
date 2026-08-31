@@ -1,12 +1,25 @@
 import { createClient } from '@supabase/supabase-js';
 
+export const SHOPS = [
+  { id: 'velll', name: 'Velll Shop' },
+  { id: 'bana', name: 'Bana Shop' },
+];
+
+export const DEFAULT_SHOP_ID = SHOPS[0].id;
+
+export const getShopName = (shopId) => SHOPS.find((shop) => shop.id === shopId)?.name || shopId;
+
+export const PART_SIDES = ['N/A', 'Left', 'Right'];
+
 export const demoInventory = [
   {
     id: 1,
+    shop: 'velll',
     name: 'Toyota Corolla Engine Gasket Set',
-    category: 'Engine Parts',
+    category: 'Mechanical',
     brand: 'Toyota',
     model: 'Corolla',
+    side: 'N/A',
     supplier: 'Motorline Kenya',
     imageUrl: 'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&w=900&q=80',
     stock: 18,
@@ -16,10 +29,12 @@ export const demoInventory = [
   },
   {
     id: 2,
+    shop: 'bana',
     name: 'Mazda 323 Timing Belt Kit',
-    category: 'Engine Parts',
+    category: 'Mechanical',
     brand: 'Mazda',
     model: '323',
+    side: 'N/A',
     supplier: 'AutoDrive Suppliers',
     imageUrl: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=900&q=80',
     stock: 5,
@@ -29,10 +44,12 @@ export const demoInventory = [
   },
   {
     id: 3,
+    shop: 'velll',
     name: 'Honda Civic Brake Pad Set',
-    category: 'Brake System',
+    category: 'Mechanical',
     brand: 'Honda',
     model: 'Civic',
+    side: 'N/A',
     supplier: 'BrakeMax',
     imageUrl: 'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=900&q=80',
     stock: 10,
@@ -42,10 +59,12 @@ export const demoInventory = [
   },
   {
     id: 4,
+    shop: 'bana',
     name: 'Nissan Sentra Starter Motor',
     category: 'Electrical',
     brand: 'Nissan',
     model: 'Sentra',
+    side: 'N/A',
     supplier: 'Powerline Motors',
     imageUrl: 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=900&q=80',
     stock: 3,
@@ -55,10 +74,12 @@ export const demoInventory = [
   },
   {
     id: 5,
+    shop: 'velll',
     name: 'Ford Ranger Suspension Kit',
-    category: 'Suspension',
+    category: 'Mechanical',
     brand: 'Ford',
     model: 'Ranger',
+    side: 'N/A',
     supplier: 'RidePro',
     imageUrl: 'https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=900&q=80',
     stock: 8,
@@ -68,10 +89,12 @@ export const demoInventory = [
   },
   {
     id: 6,
+    shop: 'bana',
     name: 'Volkswagen Polo Clutch Kit',
-    category: 'Transmission',
+    category: 'Mechanical',
     brand: 'Volkswagen',
     model: 'Polo',
+    side: 'N/A',
     supplier: 'DriveCore',
     imageUrl: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=900&q=80',
     stock: 12,
@@ -82,33 +105,34 @@ export const demoInventory = [
 ];
 
 export const demoSuppliers = [
-  { id: 1, name: 'Motorline Kenya', contact: 'Jane', phone: '+254700111222', email: 'sales@motorline.co.ke' },
-  { id: 2, name: 'AutoDrive Suppliers', contact: 'Alex', phone: '+254712222333', email: 'orders@autodrive.co.ke' },
-  { id: 3, name: 'Powerline Motors', contact: 'Mary', phone: '+254723333444', email: 'support@powerline.co.ke' },
+  { id: 1, shop: 'velll', name: 'Motorline Kenya', contact: 'Jane', phone: '+254700111222', email: 'sales@motorline.co.ke' },
+  { id: 2, shop: 'bana', name: 'AutoDrive Suppliers', contact: 'Alex', phone: '+254712222333', email: 'orders@autodrive.co.ke' },
+  { id: 3, shop: 'bana', name: 'Powerline Motors', contact: 'Mary', phone: '+254723333444', email: 'support@powerline.co.ke' },
 ];
 
 export const demoPurchaseOrders = [
-  { id: 1, supplierId: 1, supplierName: 'Motorline Kenya', itemId: 1, itemName: 'Toyota Corolla Engine Gasket Set', quantity: 8, unitCost: 900, orderDate: '2026-08-01', status: 'Received' },
-  { id: 2, supplierId: 2, supplierName: 'AutoDrive Suppliers', itemId: 2, itemName: 'Mazda 323 Timing Belt Kit', quantity: 5, unitCost: 1180, orderDate: '2026-08-04', status: 'Pending' },
+  { id: 1, shop: 'velll', supplierId: 1, supplierName: 'Motorline Kenya', itemId: 1, itemName: 'Toyota Corolla Engine Gasket Set', quantity: 8, unitCost: 900, orderDate: '2026-08-01', status: 'Received' },
+  { id: 2, shop: 'bana', supplierId: 2, supplierName: 'AutoDrive Suppliers', itemId: 2, itemName: 'Mazda 323 Timing Belt Kit', quantity: 5, unitCost: 1180, orderDate: '2026-08-04', status: 'Pending' },
 ];
 
 export const demoStockMovements = [
-  { id: 1, type: 'Stock In', itemName: 'Toyota Corolla Engine Gasket Set', quantity: 8, date: '2026-08-01', note: 'Purchase order received' },
-  { id: 2, type: 'Sale', itemName: 'Honda Civic Brake Pad Set', quantity: -2, date: '2026-08-06', note: 'Customer sale' },
-  { id: 3, type: 'Stock Adjustment', itemName: 'Ford Ranger Suspension Kit', quantity: -1, date: '2026-08-10', note: 'Returned item' },
+  { id: 1, shop: 'velll', type: 'Stock In', itemName: 'Toyota Corolla Engine Gasket Set', quantity: 8, date: '2026-08-01', note: 'Purchase order received' },
+  { id: 2, shop: 'velll', type: 'Sale', itemName: 'Honda Civic Brake Pad Set', quantity: -2, date: '2026-08-06', note: 'Customer sale' },
+  { id: 3, shop: 'velll', type: 'Stock Adjustment', itemName: 'Ford Ranger Suspension Kit', quantity: -1, date: '2026-08-10', note: 'Returned item' },
+  { id: 4, shop: 'bana', type: 'Stock In', itemName: 'Mazda 323 Timing Belt Kit', quantity: 5, date: '2026-08-04', note: 'Purchase order received' },
 ];
 
 export const demoSales = [
-  { id: 1, item: 'Toyota Corolla Engine Gasket Set', amount: 1680, date: '2026-08-06' },
-  { id: 2, item: 'Honda Civic Brake Pad Set', amount: 1400, date: '2026-08-08' },
-  { id: 3, item: 'Ford Ranger Suspension Kit', amount: 3200, date: '2026-08-10' },
-  { id: 4, item: 'Mazda 323 Timing Belt Kit', amount: 2100, date: '2026-08-11' },
+  { id: 1, shop: 'velll', item: 'Toyota Corolla Engine Gasket Set', amount: 1680, quantity: 1, cost: 980, date: '2026-08-06' },
+  { id: 2, shop: 'velll', item: 'Honda Civic Brake Pad Set', amount: 1400, quantity: 1, cost: 740, date: '2026-08-08' },
+  { id: 3, shop: 'velll', item: 'Ford Ranger Suspension Kit', amount: 3200, quantity: 1, cost: 1900, date: '2026-08-10' },
+  { id: 4, shop: 'bana', item: 'Mazda 323 Timing Belt Kit', amount: 2100, quantity: 1, cost: 1200, date: '2026-08-11' },
 ];
 
 export const demoExpenses = [
-  { id: 1, type: 'Installation Labour', amount: 950, note: 'Toyota gasket installation' },
-  { id: 2, type: 'Motorbike Delivery', amount: 420, note: 'Customer delivery to Kijabe' },
-  { id: 3, type: 'Part Reordering', amount: 680, note: 'Brake pad restocking' },
+  { id: 1, shop: 'velll', type: 'Installation Labour', amount: 950, note: 'Toyota gasket installation' },
+  { id: 2, shop: 'bana', type: 'Motorbike Delivery', amount: 420, note: 'Customer delivery to Kijabe' },
+  { id: 3, shop: 'velll', type: 'Part Reordering', amount: 680, note: 'Brake pad restocking' },
 ];
 
 export const demoSettings = {
@@ -133,10 +157,12 @@ export const normalizeSettings = (record = {}) => ({
 
 export const normalizeSparePart = (record = {}) => ({
   id: record.id,
+  shop: record.shop ?? DEFAULT_SHOP_ID,
   name: record.name ?? '',
-  category: record.category ?? 'Engine Parts',
+  category: record.category ?? 'Mechanical',
   brand: record.brand ?? 'General',
   model: record.model ?? '',
+  side: record.side ?? 'N/A',
   supplier: record.supplier ?? '',
   imageUrl: record.image_url ?? record.imageUrl ?? '',
   imageBucket: record.storage_bucket ?? record.image_bucket ?? record.imageUrl ?? '',
@@ -148,13 +174,17 @@ export const normalizeSparePart = (record = {}) => ({
 
 export const normalizeSale = (record = {}) => ({
   id: record.id,
+  shop: record.shop ?? DEFAULT_SHOP_ID,
   item: record.item ?? '',
   amount: Number(record.amount ?? 0),
+  quantity: Number(record.quantity ?? 1),
+  cost: Number(record.cost ?? 0),
   date: record.date ?? '',
 });
 
 export const normalizeExpense = (record = {}) => ({
   id: record.id,
+  shop: record.shop ?? DEFAULT_SHOP_ID,
   type: record.type ?? '',
   amount: Number(record.amount ?? 0),
   note: record.note ?? '',
@@ -163,6 +193,7 @@ export const normalizeExpense = (record = {}) => ({
 
 export const normalizeSupplier = (record = {}) => ({
   id: record.id,
+  shop: record.shop ?? DEFAULT_SHOP_ID,
   name: record.name ?? '',
   contact: record.contact ?? '',
   phone: record.phone ?? '',
@@ -171,6 +202,7 @@ export const normalizeSupplier = (record = {}) => ({
 
 export const normalizePurchaseOrder = (record = {}) => ({
   id: record.id,
+  shop: record.shop ?? DEFAULT_SHOP_ID,
   supplierId: record.supplier_id ?? record.supplierId ?? null,
   supplierName: record.supplier_name ?? record.supplierName ?? '',
   itemId: record.item_id ?? record.itemId ?? null,
@@ -183,6 +215,7 @@ export const normalizePurchaseOrder = (record = {}) => ({
 
 export const normalizeStockMovement = (record = {}) => ({
   id: record.id,
+  shop: record.shop ?? DEFAULT_SHOP_ID,
   type: record.type ?? '',
   itemName: record.item_name ?? record.itemName ?? '',
   quantity: Number(record.quantity ?? 0),
@@ -351,10 +384,12 @@ export async function saveSparePart(item) {
   if (!supabase) return { success: false, mode: 'demo' };
 
   const payload = {
+    shop: item.shop || DEFAULT_SHOP_ID,
     name: item.name,
     category: item.category,
     brand: item.brand || 'General',
     model: item.model || '',
+    side: item.side || 'N/A',
     supplier: item.supplier || '',
     image_url: item.imageUrl || '',
     stock: Number(item.stock || 0),
@@ -399,8 +434,11 @@ export async function saveSale(sale) {
   if (!supabase) return { success: false, mode: 'demo' };
 
   const payload = {
+    shop: sale.shop || DEFAULT_SHOP_ID,
     item: sale.item,
     amount: Number(sale.amount || 0),
+    quantity: Number(sale.quantity || 1),
+    cost: Number(sale.cost || 0),
     date: sale.date,
   };
 
@@ -413,7 +451,7 @@ export async function saveSale(sale) {
     }
 
     if (result.error && (result.error.message?.includes('date') || result.error.code === 'PGRST204')) {
-      const fallbackPayload = { item: sale.item, amount: Number(sale.amount || 0) };
+      const fallbackPayload = { shop: sale.shop || DEFAULT_SHOP_ID, item: sale.item, amount: Number(sale.amount || 0) };
       if (sale.id && typeof sale.id === 'number' && sale.id < 10000000000) {
         result = await supabase.from('sales').update(fallbackPayload).eq('id', sale.id).select().single();
       } else {
@@ -448,6 +486,7 @@ export async function saveExpense(expense) {
   if (!supabase) return { success: false, mode: 'demo' };
 
   const payload = {
+    shop: expense.shop || DEFAULT_SHOP_ID,
     type: expense.type,
     amount: Number(expense.amount || 0),
     note: expense.note || '',
@@ -464,6 +503,7 @@ export async function saveExpense(expense) {
 
     if (result.error && (result.error.message?.includes('date') || result.error.code === 'PGRST204')) {
       const fallbackPayload = {
+        shop: expense.shop || DEFAULT_SHOP_ID,
         type: expense.type,
         amount: Number(expense.amount || 0),
         note: expense.note || '',
@@ -502,6 +542,7 @@ export async function saveSupplier(supplier) {
   if (!supabase) return { success: false, mode: 'demo' };
 
   const payload = {
+    shop: supplier.shop || DEFAULT_SHOP_ID,
     name: supplier.name,
     contact: supplier.contact || '',
     phone: supplier.phone || '',
@@ -543,6 +584,7 @@ export async function savePurchaseOrder(order) {
   if (!supabase) return { success: false, mode: 'demo' };
 
   const payload = {
+    shop: order.shop || DEFAULT_SHOP_ID,
     supplier_id: order.supplierId ? Number(order.supplierId) : null,
     supplier_name: order.supplierName || '',
     item_id: order.itemId ? Number(order.itemId) : null,
@@ -588,6 +630,7 @@ export async function saveStockMovement(movement) {
   if (!supabase) return { success: false, mode: 'demo' };
 
   const payload = {
+    shop: movement.shop || DEFAULT_SHOP_ID,
     type: movement.type,
     item_name: movement.itemName,
     quantity: Number(movement.quantity || 0),
