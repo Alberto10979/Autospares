@@ -687,3 +687,21 @@ export async function updateSparePartPrices(id, cost, salePrice) {
     return { success: false, error: error.message };
   }
 }
+
+export async function clearShopData(shopId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { success: false, mode: 'demo' };
+
+  const tables = ['stock_movements', 'purchase_orders', 'sales', 'expenses', 'suppliers', 'spares'];
+
+  try {
+    for (const table of tables) {
+      const { error } = await supabase.from(table).delete().eq('shop', shopId);
+      if (error) throw error;
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error clearing shop data in Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}

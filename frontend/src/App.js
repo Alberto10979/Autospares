@@ -29,6 +29,7 @@ import {
   saveStockMovement,
   updateSparePartStock,
   updateSparePartPrices,
+  clearShopData,
 } from './supabase';
 
 const categories = ['All', 'Body', 'Electrical', 'Mechanical'];
@@ -453,9 +454,18 @@ function App() {
     setStatusMessage(`Demo data restored for ${getShopName(selectedShop)}.`);
   };
 
-  const handleClearAllData = () => {
-    const shouldClear = window.confirm(`Clear all data for ${getShopName(selectedShop)}? The other shop's data is kept.`);
+  const handleClearAllData = async () => {
+    const shouldClear = window.confirm(`Permanently delete all data for ${getShopName(selectedShop)}? The other shop's data is kept. This cannot be undone.`);
     if (!shouldClear) return;
+
+    if (supabaseEnabled) {
+      setStatusMessage(`Clearing ${getShopName(selectedShop)} data from the database...`);
+      const res = await clearShopData(selectedShop);
+      if (!res.success) {
+        setStatusMessage(`Error clearing data in Supabase: ${res.error}`);
+        return;
+      }
+    }
 
     const belongsToOtherShop = (record) => record.shop !== selectedShop;
 
