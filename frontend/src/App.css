@@ -631,9 +631,32 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
   font-size: 0.85rem;
 }
 
+.pl-section-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--muted);
+  margin: 20px 0 8px;
+}
+
+.pl-section-label:first-of-type {
+  margin-top: 0;
+}
+
 .pl-table {
   width: 100%;
   border-collapse: collapse;
+}
+
+.pl-table th {
+  text-align: left;
+  padding: 6px 4px 10px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  border-bottom: 2px solid var(--line);
 }
 
 .pl-table td {
@@ -645,6 +668,19 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
 .pl-table td:last-child {
   text-align: right;
   font-weight: 600;
+}
+
+.pl-table .pl-num,
+.pl-table th.pl-num {
+  text-align: right;
+}
+
+.pl-table .pl-negative {
+  color: var(--accent-1);
+}
+
+.pl-line-items {
+  margin-bottom: 8px;
 }
 
 .pl-table .pl-subtotal td {

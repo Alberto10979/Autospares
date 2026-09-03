@@ -1444,6 +1444,46 @@ function App() {
               <section className={`pl-statement ${printScope === 'profit-loss' ? 'pl-statement-active' : ''}`}>
                 <h3>{settings.businessName} — Profit &amp; Loss Statement</h3>
                 <p className="pl-statement-date">{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+
+                <p className="pl-section-label">Sales Breakdown</p>
+                {sales.length > 0 ? (
+                  <table className="pl-table pl-line-items">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Item</th>
+                        <th className="pl-num">Qty</th>
+                        <th className="pl-num">Amount</th>
+                        <th className="pl-num">Cost</th>
+                        <th className="pl-num">Profit / Loss</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sales.map((sale) => {
+                        const qty = Number(sale.quantity) || 1;
+                        const cost = Number(sale.cost || 0) * qty;
+                        const amount = Number(sale.amount || 0);
+                        const saleProfit = amount - cost;
+                        return (
+                          <tr key={sale.id}>
+                            <td>{sale.date}</td>
+                            <td>{sale.item}</td>
+                            <td className="pl-num">{qty}</td>
+                            <td className="pl-num">KES {amount.toLocaleString()}</td>
+                            <td className="pl-num">KES {cost.toLocaleString()}</td>
+                            <td className={`pl-num ${saleProfit < 0 ? 'pl-negative' : ''}`}>
+                              KES {saleProfit.toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="pl-statement-date">No sales recorded yet.</p>
+                )}
+
+                <p className="pl-section-label">Summary</p>
                 <table className="pl-table">
                   <tbody>
                     <tr>
