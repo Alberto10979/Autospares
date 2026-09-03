@@ -381,8 +381,10 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
   display: block;
   width: 40px;
   height: 40px;
+  padding: 4px;
   border-radius: 12px;
-  object-fit: cover;
+  background: #ffffff;
+  object-fit: contain;
   box-shadow: 0 6px 16px rgba(228, 24, 28, 0.3);
 }
 
