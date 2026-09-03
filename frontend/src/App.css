@@ -10,10 +10,10 @@
   --navy-1: #1e293b;
   --navy-2: #2c3e50;
   --navy-3: #34495e;
-  --accent-1: #c85a3a;
-  --accent-2: #d97706;
-  --accent-soft: #fef0e6;
-  --accent-tint: #fef7f2;
+  --accent-1: #e4181c;
+  --accent-2: #b01118;
+  --accent-soft: #fde3e3;
+  --accent-tint: #fdf3f3;
   --success: #6b9e5f;
   --danger-bg: #fee2e2;
   --danger-text: #991b1b;
@@ -78,7 +78,7 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
 .shop-gate::before {
   width: 480px;
   height: 480px;
-  background: radial-gradient(circle, rgba(200, 90, 58, 0.35), transparent 70%);
+  background: radial-gradient(circle, rgba(228, 24, 28, 0.35), transparent 70%);
   top: -160px;
   right: -120px;
 }
@@ -86,7 +86,7 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
 .shop-gate::after {
   width: 380px;
   height: 380px;
-  background: radial-gradient(circle, rgba(217, 119, 6, 0.25), transparent 70%);
+  background: radial-gradient(circle, rgba(176, 17, 24, 0.25), transparent 70%);
   bottom: -140px;
   left: -100px;
 }
@@ -328,16 +328,12 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
 }
 
 .brand-mark {
+  display: block;
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  box-shadow: 0 6px 16px rgba(200, 90, 58, 0.3);
+  object-fit: cover;
+  box-shadow: 0 6px 16px rgba(228, 24, 28, 0.3);
 }
 
 .sidebar h1 {
@@ -441,8 +437,8 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
   background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
   color: white;
   font-weight: 700;
-  border-color: rgba(200, 90, 58, 0.2);
-  box-shadow: 0 8px 20px rgba(200, 90, 58, 0.35);
+  border-color: rgba(228, 24, 28, 0.2);
+  box-shadow: 0 8px 20px rgba(228, 24, 28, 0.35);
 }
 
 .sidebar-summary {
@@ -497,7 +493,7 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
 
 .dot.offline {
   background: var(--accent-2);
-  color: rgba(217, 119, 6, 0.25);
+  color: rgba(176, 17, 24, 0.25);
 }
 
 /* ---------------------------------- */
@@ -740,7 +736,7 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
 .mini-form select:focus {
   outline: none;
   border-color: var(--accent-1);
-  box-shadow: 0 0 0 3px rgba(200, 90, 58, 0.15);
+  box-shadow: 0 0 0 3px rgba(228, 24, 28, 0.15);
 }
 
 .inventory-grid {
@@ -802,7 +798,7 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
 
 .brand {
   background: var(--accent-soft);
-  color: #8b5e3c;
+  color: #9c1015;
   padding: 4px 10px;
   border-radius: 999px;
   font-weight: 600;

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import logo from './assets/logo.png';
+import logoSquare from './assets/logo-square.png';
 import {
   SHOPS,
   getShopName,
@@ -38,7 +39,7 @@ const shopThemes = {
   velll: { icon: '🏬', accent: '#2563eb', accent2: '#0ea5e9', soft: '#eaf2ff' },
   bana: { icon: '🏪', accent: '#9333ea', accent2: '#db2777', soft: '#faf0ff' },
 };
-const getShopTheme = (shopId) => shopThemes[shopId] || { icon: '🏪', accent: '#c85a3a', accent2: '#d97706', soft: '#fef0e6' };
+const getShopTheme = (shopId) => shopThemes[shopId] || { icon: '🏪', accent: '#e4181c', accent2: '#b01118', soft: '#fde3e3' };
 const expenseTypes = ['Installation Labour', 'Motorbike Delivery', 'Part Reordering', 'Workshop Rent', 'Utilities'];
 
 const makeToday = () => new Date().toISOString().slice(0, 10);
@@ -1268,7 +1269,7 @@ function App() {
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="sidebar-brand">
-            <div className="brand-mark">A</div>
+            <img src={logoSquare} alt={settings.businessName} className="brand-mark" />
             <div>
               <p className="eyebrow">AutoSpare Pro</p>
               <h1>{settings.businessName}</h1>
@@ -1678,8 +1679,8 @@ function App() {
                           onClick={handleOpenCamera}
                           className="file-upload-box"
                           style={{
-                            background: '#fef7f2',
-                            border: '2px dashed #d97706',
+                            background: '#eef1f6',
+                            border: '2px dashed #334155',
                             borderRadius: '12px',
                             padding: '16px',
                             textAlign: 'center',
@@ -1769,8 +1770,8 @@ function App() {
                       </div>
 
                       <div style={{
-                        background: stockForm.imageUrl?.trim() ? '#fef7f2' : '#fee2e2',
-                        border: `1px solid ${stockForm.imageUrl?.trim() ? '#d97706' : '#dc2626'}`,
+                        background: stockForm.imageUrl?.trim() ? '#eef1f6' : '#fee2e2',
+                        border: `1px solid ${stockForm.imageUrl?.trim() ? '#334155' : '#dc2626'}`,
                         borderRadius: '10px',
                         padding: '12px',
                         marginBottom: '12px',
@@ -1778,7 +1779,7 @@ function App() {
                       }}>
                         {stockForm.imageUrl?.trim() ? (
                           <>
-                            <strong style={{ color: '#8b5e3c' }}>✓ Image URL ready</strong>
+                            <strong style={{ color: '#334155' }}>✓ Image URL ready</strong>
                             <small style={{ display: 'block', color: '#6b7280', marginTop: '4px' }}>
                               {stockForm.imageUrl.substring(0, 60)}...
                             </small>
