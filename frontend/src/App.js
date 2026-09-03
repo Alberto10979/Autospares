@@ -300,6 +300,18 @@ function App() {
     };
   }, []);
 
+  const [printScope, setPrintScope] = useState('financial');
+
+  const handlePrintFinancialReport = () => {
+    setPrintScope('financial');
+    window.print();
+  };
+
+  const handlePrintProfitLoss = () => {
+    setPrintScope('profit-loss');
+    window.print();
+  };
+
   const themeToggleButton = (
     <button
       type="button"
@@ -1399,8 +1411,10 @@ function App() {
               <div className="topbar-actions">
                 {adminAuthenticated ? (
                   <>
-                    <span className="pill">Profit and Loss</span>
-                    <button type="button" className="primary-btn small print-btn" onClick={() => window.print()}>
+                    <button type="button" className="pill pill-btn print-btn" onClick={handlePrintProfitLoss}>
+                      🖨️ Profit and Loss
+                    </button>
+                    <button type="button" className="primary-btn small print-btn" onClick={handlePrintFinancialReport}>
                       🖨️ Print Financial Report
                     </button>
                     <button type="button" className="ghost-btn small" onClick={handleAdminLogout}>
@@ -1418,51 +1432,84 @@ function App() {
               </div>
             </header>
 
-            <section className="stats-grid">
-              {dashboardCards.map((card) => (
-                <article key={card.label} className="stat-card">
-                  <span>{card.label}</span>
-                  <strong>{card.value}</strong>
-                </article>
-              ))}
-            </section>
-
-            {adminAuthenticated ? (
-              <section className="content-grid">
-                <div className="panel">
-                  <h3>Sales Summary</h3>
-                  <ul className="list">
-                    {sales.map((sale) => (
-                      <li key={sale.id}>
-                        <span>{sale.item}</span>
-                        <strong>KES {Number(sale.amount).toLocaleString()}</strong>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="panel">
-                  <h3>Liabilities / Expenses</h3>
-                  <ul className="list">
-                    {expenses.map((expense) => (
-                      <li key={expense.id}>
-                        <span>{expense.type}</span>
-                        <strong>KES {Number(expense.amount).toLocaleString()}</strong>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </section>
-            ) : (
-              <section className="content-grid">
-                <div className="panel" style={{ gridColumn: '1 / -1' }}>
-                  <h3>Welcome to {settings.businessName}</h3>
-                  <p style={{ color: '#64748b' }}>
-                    Browse our full inventory of quality vehicle spare parts. Select a category below or search by part name, brand, or model to check live prices and stock availability.
-                  </p>
-                </div>
+            {adminAuthenticated && (
+              <section className={`pl-statement ${printScope === 'profit-loss' ? 'pl-statement-active' : ''}`}>
+                <h3>{settings.businessName} — Profit &amp; Loss Statement</h3>
+                <p className="pl-statement-date">{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                <table className="pl-table">
+                  <tbody>
+                    <tr>
+                      <td>Total Income</td>
+                      <td>KES {totalSales.toLocaleString()}</td>
+                    </tr>
+                    <tr>
+                      <td>Cost of Goods Sold</td>
+                      <td>KES {totalCostOfGoodsSold.toLocaleString()}</td>
+                    </tr>
+                    <tr className="pl-subtotal">
+                      <td>Gross Profit</td>
+                      <td>KES {grossProfit.toLocaleString()}</td>
+                    </tr>
+                    <tr>
+                      <td>Total Expenses / Liabilities</td>
+                      <td>KES {totalExpenses.toLocaleString()}</td>
+                    </tr>
+                    <tr className="pl-total">
+                      <td>Net {profitAndLoss >= 0 ? 'Profit' : 'Loss'}</td>
+                      <td>KES {Math.abs(profitAndLoss).toLocaleString()}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </section>
             )}
+
+            <div className={printScope === 'profit-loss' ? 'print-hide' : ''}>
+              <section className="stats-grid">
+                {dashboardCards.map((card) => (
+                  <article key={card.label} className="stat-card">
+                    <span>{card.label}</span>
+                    <strong>{card.value}</strong>
+                  </article>
+                ))}
+              </section>
+
+              {adminAuthenticated ? (
+                <section className="content-grid">
+                  <div className="panel">
+                    <h3>Sales Summary</h3>
+                    <ul className="list">
+                      {sales.map((sale) => (
+                        <li key={sale.id}>
+                          <span>{sale.item}</span>
+                          <strong>KES {Number(sale.amount).toLocaleString()}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="panel">
+                    <h3>Liabilities / Expenses</h3>
+                    <ul className="list">
+                      {expenses.map((expense) => (
+                        <li key={expense.id}>
+                          <span>{expense.type}</span>
+                          <strong>KES {Number(expense.amount).toLocaleString()}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </section>
+              ) : (
+                <section className="content-grid">
+                  <div className="panel" style={{ gridColumn: '1 / -1' }}>
+                    <h3>Welcome to {settings.businessName}</h3>
+                    <p style={{ color: '#64748b' }}>
+                      Browse our full inventory of quality vehicle spare parts. Select a category below or search by part name, brand, or model to check live prices and stock availability.
+                    </p>
+                  </div>
+                </section>
+              )}
+            </div>
           </>
         )}
 
