@@ -795,6 +795,57 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
   gap: 18px;
 }
 
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.pagination-pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pagination-page {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.pagination-page:hover {
+  border-color: var(--accent-1);
+  color: var(--ink);
+}
+
+.pagination-page.active {
+  background: var(--navy-2);
+  border-color: var(--navy-2);
+  color: white;
+}
+
+.pagination .ghost-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pagination-summary {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .inventory-card {
   padding: 18px;
   border: 1px solid var(--line);
@@ -1106,7 +1157,9 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
   .nav,
   .status-chip,
   .print-btn,
-  .topbar-actions .pill {
+  .topbar-actions .pill,
+  .pagination,
+  .theme-toggle {
     display: none !important;
   }
 
@@ -1153,5 +1206,11 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
 
   .shop-gate-card {
     padding: 30px 22px;
+  }
+
+  .pagination-summary {
+    margin-left: 0;
+    width: 100%;
+    order: 3;
   }
 }

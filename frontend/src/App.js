@@ -35,6 +35,7 @@ import {
 } from './supabase';
 
 const categories = ['All', 'Body', 'Electrical', 'Mechanical'];
+const INVENTORY_PAGE_SIZE = 12;
 const shopThemes = {
   velll: { icon: '🏬', accent: '#2563eb', accent2: '#0ea5e9', soft: '#eaf2ff' },
   bana: { icon: '🏪', accent: '#9333ea', accent2: '#db2777', soft: '#faf0ff' },
@@ -166,6 +167,7 @@ function App() {
   });
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
+  const [inventoryPage, setInventoryPage] = useState(1);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [adminForm, setAdminForm] = useState(settings);
   const [stockForm, setStockForm] = useState(emptyStockForm);
@@ -285,6 +287,19 @@ function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  useEffect(() => {
+    const handleBeforePrint = () => setIsPrinting(true);
+    const handleAfterPrint = () => setIsPrinting(false);
+    window.addEventListener('beforeprint', handleBeforePrint);
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+  }, []);
+
   const themeToggleButton = (
     <button
       type="button"
@@ -339,6 +354,24 @@ function App() {
       return haystack.includes(normalizedSearch);
     });
   }, [inventory, searchTerm, selectedCategory]);
+
+  const inventoryTotalPages = Math.max(1, Math.ceil(filteredInventory.length / INVENTORY_PAGE_SIZE));
+
+  useEffect(() => {
+    setInventoryPage(1);
+  }, [searchTerm, selectedCategory]);
+
+  useEffect(() => {
+    if (inventoryPage > inventoryTotalPages) {
+      setInventoryPage(inventoryTotalPages);
+    }
+  }, [inventoryPage, inventoryTotalPages]);
+
+  const paginatedInventory = useMemo(() => {
+    if (isPrinting) return filteredInventory;
+    const start = (inventoryPage - 1) * INVENTORY_PAGE_SIZE;
+    return filteredInventory.slice(start, start + INVENTORY_PAGE_SIZE);
+  }, [filteredInventory, inventoryPage, isPrinting]);
 
   const totalSales = sales.reduce((sum, sale) => sum + Number(sale.amount || 0), 0);
   const totalExpenses = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
@@ -1471,7 +1504,7 @@ function App() {
             </div>
 
             <section className="inventory-grid">
-              {filteredInventory.length > 0 ? filteredInventory.map((item) => {
+              {filteredInventory.length > 0 ? paginatedInventory.map((item) => {
                 const isLow = Number(item.stock) <= Number(item.reorderLevel || settings.minimumStockAlert);
                 const hasImage = item.imageUrl && item.imageUrl.trim().length > 0;
                 const fallbackImage = 'https://images.unsplash.com/photo-1489824904134-891ab64532f1?auto=format&fit=crop&w=900&q=80';
@@ -1564,6 +1597,43 @@ function App() {
                 );
               }) : <p className="empty-state">No parts match your search.</p>}
             </section>
+
+            {filteredInventory.length > INVENTORY_PAGE_SIZE && (
+              <nav className="pagination" aria-label="Inventory pages">
+                <button
+                  type="button"
+                  className="ghost-btn small"
+                  onClick={() => setInventoryPage((page) => Math.max(1, page - 1))}
+                  disabled={inventoryPage === 1}
+                >
+                  ← Prev
+                </button>
+                <div className="pagination-pages">
+                  {Array.from({ length: inventoryTotalPages }, (_, index) => index + 1).map((page) => (
+                    <button
+                      key={page}
+                      type="button"
+                      className={page === inventoryPage ? 'pagination-page active' : 'pagination-page'}
+                      onClick={() => setInventoryPage(page)}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="ghost-btn small"
+                  onClick={() => setInventoryPage((page) => Math.min(inventoryTotalPages, page + 1))}
+                  disabled={inventoryPage === inventoryTotalPages}
+                >
+                  Next →
+                </button>
+                <span className="pagination-summary">
+                  Showing {(inventoryPage - 1) * INVENTORY_PAGE_SIZE + 1}
+                  –{Math.min(inventoryPage * INVENTORY_PAGE_SIZE, filteredInventory.length)} of {filteredInventory.length} parts
+                </span>
+              </nav>
+            )}
           </>
         )}
 
