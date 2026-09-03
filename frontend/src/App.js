@@ -179,7 +179,7 @@ function App() {
   const [editingItemId, setEditingItemId] = useState(null);
   const [statusMessage, setStatusMessage] = useState('');
   const [supabaseEnabled, setSupabaseEnabled] = useState(false);
-  const [adminAuthenticated, setAdminAuthenticated] = useState(false);
+  const [adminAuthenticated, setAdminAuthenticated] = useState(true);
   const [adminSection, setAdminSection] = useState('stock');
   const [supplierQuery, setSupplierQuery] = useState('');
   const [orderQuery, setOrderQuery] = useState('');
