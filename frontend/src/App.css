@@ -117,24 +117,16 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
 }
 
 .shop-gate-logo {
-  width: 56px;
-  height: 56px;
+  display: block;
+  width: 132px;
+  height: auto;
   margin: 0 auto 18px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 1.4rem;
-  box-shadow: 0 10px 24px rgba(200, 90, 58, 0.35);
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.35);
 }
 
 .shop-gate-logo.admin-mode {
-  background: linear-gradient(135deg, #2563eb, #9333ea);
   box-shadow: 0 10px 24px rgba(88, 61, 234, 0.4);
-  font-size: 1.6rem;
 }
 
 .shop-gate-card .eyebrow {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
+import logo from './assets/logo.png';
 import {
   SHOPS,
   getShopName,
@@ -745,6 +746,10 @@ function App() {
     setStatusMessage('Spare part deleted successfully.');
   };
 
+  const findItemBySaleLabel = (label) =>
+    inventory.find((item) => `${item.brand} ${item.name}` === label) ||
+    inventory.find((item) => item.name === label);
+
   const handleAddSale = async (event) => {
     event.preventDefault();
     const chosenItem = inventory.find((item) => String(item.id) === String(saleForm.itemId));
@@ -754,6 +759,11 @@ function App() {
     const amount = Number(saleForm.amount) || Number(chosenItem.salePrice || 0);
     const unitCost = Number(chosenItem.cost || 0);
     const saleItemName = `${chosenItem.brand} ${chosenItem.name}`;
+
+    const originalSale = editingSaleId ? sales.find((sale) => String(sale.id) === String(editingSaleId)) : null;
+    const originalQuantity = originalSale ? (Number(originalSale.quantity) || 1) : 0;
+    const originalItem = originalSale ? findItemBySaleLabel(originalSale.item) : null;
+    const itemChanged = Boolean(originalItem) && String(originalItem.id) !== String(chosenItem.id);
 
     let savedSale = {
       id: editingSaleId || Date.now(),
@@ -785,6 +795,42 @@ function App() {
           date: saleForm.date,
           note: 'Customer sale recorded',
         });
+      } else if (originalSale) {
+        if (itemChanged) {
+          if (originalItem) {
+            await updateSparePartStock(originalItem.id, Number(originalItem.stock) + originalQuantity);
+            await saveStockMovement({
+              shop: selectedShop,
+              type: 'Stock Adjustment',
+              itemName: `${originalItem.brand} ${originalItem.name}`,
+              quantity: originalQuantity,
+              date: saleForm.date,
+              note: 'Sale edited - reassigned to a different part, stock restored',
+            });
+          }
+          await updateSparePartStock(chosenItem.id, Math.max(0, Number(chosenItem.stock) - quantity));
+          await saveStockMovement({
+            shop: selectedShop,
+            type: 'Sale',
+            itemName: saleItemName,
+            quantity: -quantity,
+            date: saleForm.date,
+            note: 'Sale edited - reassigned to this part',
+          });
+        } else {
+          const stockDelta = originalQuantity - quantity;
+          if (stockDelta !== 0) {
+            await updateSparePartStock(chosenItem.id, Math.max(0, Number(chosenItem.stock) + stockDelta));
+            await saveStockMovement({
+              shop: selectedShop,
+              type: 'Stock Adjustment',
+              itemName: saleItemName,
+              quantity: stockDelta,
+              date: saleForm.date,
+              note: 'Sale edited - stock reconciled',
+            });
+          }
+        }
       }
     }
 
@@ -792,6 +838,60 @@ function App() {
       setAllSales((previous) => previous.map((sale) =>
         String(sale.id) === String(editingSaleId) ? savedSale : sale
       ));
+
+      if (originalSale) {
+        setAllInventory((previous) => previous.map((item) => {
+          if (itemChanged && originalItem && String(item.id) === String(originalItem.id)) {
+            return { ...item, stock: Number(item.stock) + originalQuantity };
+          }
+          if (String(item.id) === String(chosenItem.id)) {
+            const stockDelta = itemChanged ? -quantity : (originalQuantity - quantity);
+            return { ...item, stock: Math.max(0, Number(item.stock) + stockDelta) };
+          }
+          return item;
+        }));
+
+        const movements = [];
+        if (itemChanged) {
+          if (originalItem) {
+            movements.push({
+              id: Date.now(),
+              shop: selectedShop,
+              type: 'Stock Adjustment',
+              itemName: `${originalItem.brand} ${originalItem.name}`,
+              quantity: originalQuantity,
+              date: saleForm.date,
+              note: 'Sale edited - reassigned to a different part, stock restored',
+            });
+          }
+          movements.push({
+            id: Date.now() + 1,
+            shop: selectedShop,
+            type: 'Sale',
+            itemName: saleItemName,
+            quantity: -quantity,
+            date: saleForm.date,
+            note: 'Sale edited - reassigned to this part',
+          });
+        } else {
+          const stockDelta = originalQuantity - quantity;
+          if (stockDelta !== 0) {
+            movements.push({
+              id: Date.now(),
+              shop: selectedShop,
+              type: 'Stock Adjustment',
+              itemName: saleItemName,
+              quantity: stockDelta,
+              date: saleForm.date,
+              note: 'Sale edited - stock reconciled',
+            });
+          }
+        }
+        if (movements.length) {
+          setAllStockMovements((previous) => [...movements, ...previous]);
+        }
+      }
+
       setStatusMessage('Sale updated successfully.');
     } else {
       setAllSales((previous) => [savedSale, ...previous]);
@@ -1062,7 +1162,7 @@ function App() {
     return (
       <div className="shop-gate admin-mode">
         <div className="shop-gate-card admin-mode">
-          <div className="shop-gate-logo admin-mode">🛠️</div>
+          <img src={logo} alt={settings.businessName} className="shop-gate-logo admin-mode" />
           <p className="eyebrow">Admin Console</p>
           <h2>Select a shop to manage</h2>
           <p className="shop-gate-subtitle">
@@ -1101,7 +1201,7 @@ function App() {
         <div className="shop-gate-card">
           {!showAdminLoginFromGate ? (
             <>
-              <div className="shop-gate-logo">A</div>
+              <img src={logo} alt={settings.businessName} className="shop-gate-logo" />
               <p className="eyebrow">Welcome to</p>
               <h2>{settings.businessName}</h2>
               <p className="shop-gate-subtitle">Select a shop to browse available spare parts and live stock.</p>
@@ -1133,7 +1233,7 @@ function App() {
             </>
           ) : (
             <form className="admin-login" onSubmit={handleAdminLogin}>
-              <div className="shop-gate-logo">A</div>
+              <img src={logo} alt={settings.businessName} className="shop-gate-logo" />
               <h3>Admin Access</h3>
               <label>
                 Email
