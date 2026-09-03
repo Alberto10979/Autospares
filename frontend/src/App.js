@@ -312,6 +312,14 @@ function App() {
     window.print();
   };
 
+  const [saleToPrint, setSaleToPrint] = useState(null);
+
+  const handlePrintSaleProfitLoss = (sale) => {
+    setSaleToPrint(sale);
+    setPrintScope('sale-profit-loss');
+    window.print();
+  };
+
   const themeToggleButton = (
     <button
       type="button"
@@ -1716,6 +1724,8 @@ function App() {
                 {statusMessage && <p className="status-message">{statusMessage}</p>}
               </form>
             ) : (
+              <>
+              <div className={printScope === 'sale-profit-loss' ? 'print-hide' : ''}>
               <section className="admin-layout">
                 <div className="admin-module-nav" aria-label="Admin modules">
                   {[
@@ -2314,6 +2324,7 @@ function App() {
                             </div>
                             <div className="mini-actions">
                               <strong>KES {Number(sale.amount).toLocaleString()}</strong>
+                              <button type="button" className="ghost-btn small" onClick={() => handlePrintSaleProfitLoss(sale)}>🖨️ P&amp;L</button>
                               <button type="button" className="ghost-btn small" onClick={() => { setEditingSaleId(sale.id); setSaleForm({ itemId: inventory.find((item) => item.name === sale.item.split(' ').slice(1).join(' ') || item.name === sale.item)?.id || '', quantity: Number(sale.quantity) || 1, amount: sale.amount, date: sale.date }); }}>Edit</button>
                               <button type="button" className="danger-btn small" onClick={() => handleDeleteSale(sale.id)}>Delete</button>
                             </div>
@@ -2482,6 +2493,44 @@ function App() {
                   </form>
                 )}
               </section>
+              </div>
+
+              {saleToPrint && (
+                <section className={`pl-statement ${printScope === 'sale-profit-loss' ? 'pl-statement-active' : ''}`}>
+                  <h3>{settings.businessName} — Sale Profit &amp; Loss</h3>
+                  <p className="pl-statement-date">{saleToPrint.item} · {saleToPrint.date}</p>
+                  <table className="pl-table">
+                    <tbody>
+                      <tr>
+                        <td>Item</td>
+                        <td>{saleToPrint.item}</td>
+                      </tr>
+                      <tr>
+                        <td>Quantity sold</td>
+                        <td>{Number(saleToPrint.quantity) || 1}</td>
+                      </tr>
+                      <tr>
+                        <td>Sale Amount</td>
+                        <td>KES {Number(saleToPrint.amount).toLocaleString()}</td>
+                      </tr>
+                      <tr>
+                        <td>Cost of Goods Sold ({Number(saleToPrint.quantity) || 1} × KES {Number(saleToPrint.cost || 0).toLocaleString()})</td>
+                        <td>KES {(Number(saleToPrint.cost || 0) * (Number(saleToPrint.quantity) || 1)).toLocaleString()}</td>
+                      </tr>
+                      {(() => {
+                        const saleProfit = Number(saleToPrint.amount || 0) - (Number(saleToPrint.cost || 0) * (Number(saleToPrint.quantity) || 1));
+                        return (
+                          <tr className="pl-total">
+                            <td>Net {saleProfit >= 0 ? 'Profit' : 'Loss'}</td>
+                            <td>KES {Math.abs(saleProfit).toLocaleString()}</td>
+                          </tr>
+                        );
+                      })()}
+                    </tbody>
+                  </table>
+                </section>
+              )}
+              </>
             )}
           </>
         )}
