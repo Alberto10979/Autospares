@@ -9,9 +9,10 @@ html {
 body {
   margin: 0;
   font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: #f6f4f1;
-  color: #1f2937;
+  background: var(--canvas, #f6f4f1);
+  color: var(--ink, #1f2937);
   -webkit-font-smoothing: antialiased;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 button,

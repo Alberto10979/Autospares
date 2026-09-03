@@ -101,6 +101,15 @@ const emptyCostForm = {
 
 const demoDataKey = 'autospares-demo-data-v1';
 const selectedShopKey = 'autospares-selected-shop-v1';
+const themeKey = 'autospares-theme-v1';
+
+const getSavedTheme = () => {
+  try {
+    return localStorage.getItem(themeKey) === 'dark' ? 'dark' : 'light';
+  } catch (error) {
+    return 'light';
+  }
+};
 
 const getSavedShop = () => {
   try {
@@ -145,6 +154,7 @@ function App() {
   const [allSuppliers, setAllSuppliers] = useState([]);
   const [allPurchaseOrders, setAllPurchaseOrders] = useState([]);
   const [allStockMovements, setAllStockMovements] = useState([]);
+  const [theme, setTheme] = useState(() => getSavedTheme());
   const [selectedShop, setSelectedShop] = useState(() => getSavedShop());
   const [showAdminLoginFromGate, setShowAdminLoginFromGate] = useState(false);
   const [settings, setSettings] = useState({
@@ -261,6 +271,31 @@ function App() {
       console.warn('Unable to clear remembered shop:', error.message);
     }
   };
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem(themeKey, theme);
+    } catch (error) {
+      console.warn('Unable to save theme preference:', error.message);
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  const themeToggleButton = (
+    <button
+      type="button"
+      className="theme-toggle"
+      onClick={toggleTheme}
+      title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {theme === 'dark' ? '☀️' : '🌙'}
+    </button>
+  );
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1162,6 +1197,7 @@ function App() {
   if (adminAuthenticated && !selectedShop) {
     return (
       <div className="shop-gate admin-mode">
+        {themeToggleButton}
         <div className="shop-gate-card admin-mode">
           <img src={logo} alt={settings.businessName} className="shop-gate-logo admin-mode" />
           <p className="eyebrow">Admin Console</p>
@@ -1199,6 +1235,7 @@ function App() {
   if (!adminAuthenticated && !selectedShop) {
     return (
       <div className="shop-gate">
+        {themeToggleButton}
         <div className="shop-gate-card">
           {!showAdminLoginFromGate ? (
             <>
@@ -1266,6 +1303,7 @@ function App() {
 
   return (
     <div className="app-shell">
+      {themeToggleButton}
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="sidebar-brand">

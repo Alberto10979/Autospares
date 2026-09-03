@@ -27,6 +27,56 @@
   --shadow-card: 0 10px 30px rgba(28, 37, 52, 0.06);
   --shadow-lift: 0 16px 36px rgba(28, 37, 52, 0.12);
   --font-heading: 'Sora', 'Inter', 'Segoe UI', sans-serif;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --ink: #e7eaf0;
+  --ink-soft: #c3ccd9;
+  --muted: #93a0b3;
+  --line: #2c3546;
+  --surface: #1a2130;
+  --canvas: #10141d;
+  --accent-soft: #3a1618;
+  --accent-tint: #241618;
+  --danger-bg: #3f1d1d;
+  --danger-text: #fca5a5;
+  --left-tint: #17203a;
+  --left-text: #8fb1ff;
+  --right-tint: #351a2c;
+  --right-text: #f0a3d1;
+  --shadow-card: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --shadow-lift: 0 16px 36px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+
+.theme-toggle {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 1000;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.theme-toggle:hover {
+  transform: translateY(-2px) scale(1.06);
+  box-shadow: var(--shadow-lift);
+}
+
+.theme-toggle:active {
+  transform: translateY(0) scale(0.97);
 }
 
 * {
@@ -764,7 +814,7 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
 .part-image-container {
   width: 100%;
   height: 180px;
-  background: #f1f5f9;
+  background: var(--line);
   border-radius: var(--radius-md);
   overflow: hidden;
   display: flex;
@@ -942,6 +992,14 @@ h1, h2, h3, .brand-mark, .shop-gate-logo, .primary-btn, .ghost-btn, .danger-btn,
 
 .ghost-btn:hover {
   background: #e5dccf;
+}
+
+:root[data-theme='dark'] .ghost-btn {
+  background: #29303f;
+}
+
+:root[data-theme='dark'] .ghost-btn:hover {
+  background: #333c4d;
 }
 
 .danger-btn {
