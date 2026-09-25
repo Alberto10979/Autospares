@@ -179,7 +179,7 @@ function App() {
   const [editingItemId, setEditingItemId] = useState(null);
   const [statusMessage, setStatusMessage] = useState('');
   const [supabaseEnabled, setSupabaseEnabled] = useState(false);
-  const [adminAuthenticated, setAdminAuthenticated] = useState(true);
+  const [adminAuthenticated, setAdminAuthenticated] = useState(false);
   const [adminSection, setAdminSection] = useState('stock');
   const [supplierQuery, setSupplierQuery] = useState('');
   const [orderQuery, setOrderQuery] = useState('');
@@ -350,9 +350,12 @@ function App() {
             const allowedAdmin = (normalizedSettings.adminEmail || normalizedSettings.admin_email || '').trim().toLowerCase();
             const currentEmail = (data.user.email || '').trim().toLowerCase();
             setAdminAuthenticated(Boolean(allowedAdmin) && currentEmail === allowedAdmin);
+          } else {
+            setAdminAuthenticated(false);
           }
         } catch (error) {
           console.warn('Unable to check admin auth state:', error.message);
+          setAdminAuthenticated(false);
         }
       }
     };
@@ -1240,7 +1243,15 @@ function App() {
     { label: 'Expenses', value: expenses.length },
   ];
 
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    const supabase = getSupabaseClient();
+    if (supabase?.auth) {
+      try {
+        await supabase.auth.signOut();
+      } catch (error) {
+        console.warn('Supabase sign out failed:', error.message);
+      }
+    }
     setAdminAuthenticated(false);
     setShowAdminLoginFromGate(false);
     handleSwitchShop();
