@@ -198,6 +198,30 @@ function App() {
   const [cameraError, setCameraError] = useState('');
   const videoRef = useRef(null);
   const cameraStreamRef = useRef(null);
+  // --- Back/forward button support (fixes back button exiting the app) ---
+  const isPoppingRef = useRef(false);
+
+  useEffect(() => {
+    const handlePopState = (event) => {
+      isPoppingRef.current = true;
+      const state = event.state || {};
+      setSelectedShop(state.selectedShop ?? null);
+      setActiveTab(state.activeTab ?? 'dashboard');
+    };
+    window.addEventListener('popstate', handlePopState);
+    window.history.replaceState({ selectedShop, activeTab }, '');
+    return () => window.removeEventListener('popstate', handlePopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (isPoppingRef.current) {
+      isPoppingRef.current = false;
+      return;
+    }
+    window.history.pushState({ selectedShop, activeTab }, '');
+  }, [selectedShop, activeTab]);
+  // --- end back/forward support ---
 
   const applyDataBundle = (bundle) => {
     const nextSettings = {
