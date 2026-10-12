@@ -159,7 +159,7 @@ function App() {
   const [selectedShop, setSelectedShop] = useState(() => getSavedShop());
   const [showAdminLoginFromGate, setShowAdminLoginFromGate] = useState(false);
   const [settings, setSettings] = useState({
-    businessName: 'Bana and Vell Autospare Center',
+    businessName: 'Bana and Vell Parts Centre',
     currency: 'KES',
     deliveryAllowance: 500,
     installationFee: 1200,
@@ -1397,7 +1397,7 @@ function App() {
           <div className="sidebar-brand">
             <img src={logoSquare} alt={settings.businessName} className="brand-mark" />
             <div>
-              <p className="eyebrow">Bana and Vell Autospare Centre</p>
+              <p className="eyebrow">Bana and Vell Parts Centre</p>
               <h1>{settings.businessName}</h1>
             </div>
           </div>
