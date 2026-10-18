@@ -35,6 +35,8 @@ import {
 } from './supabase';
 
 const categories = ['All', 'Body', 'Electrical', 'Mechanical'];
+const CONTACT_PHONE = '0722123232';
+const CONTACT_PHONE_LINK = '+254722123232';
 const INVENTORY_PAGE_SIZE = 12;
 const shopThemes = {
   velll: { icon: '🏬', accent: '#2563eb', accent2: '#0ea5e9', soft: '#eaf2ff' },
@@ -1717,6 +1719,23 @@ function App() {
                     <div className="reorder-note">
                       {isLow ? 'Low stock - reorder required' : 'Stock level healthy'}
                     </div>
+                         <div
+                      className="card-contact"
+                      style={{
+                        marginTop: '10px',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        background: 'rgba(127, 127, 127, 0.14)',
+                        fontWeight: 600,
+                        fontSize: '0.95rem',
+                        textAlign: 'center',
+                      }}
+                    >
+                      📞 Call / WhatsApp:{' '}
+                      <a href={`tel:${CONTACT_PHONE_LINK}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                        {CONTACT_PHONE}
+                      </a>
+                    </div>
                     {adminAuthenticated && (
                       <div className="mini-actions" style={{ marginTop: '10px' }}>
                         <button type="button" className="ghost-btn small" onClick={() => handleEditItem(item)}>Edit</button>
@@ -2744,6 +2763,15 @@ function App() {
               fontSize: '1.1rem',
             }}>
               {zoomedImage.title}
+            </div>
+              <div style={{
+              marginTop: '6px',
+              color: 'white',
+              textAlign: 'center',
+              fontWeight: 600,
+              fontSize: '1rem',
+            }}>
+              📞 {CONTACT_PHONE}
             </div>
             <button 
               type="button" 
