@@ -6,15 +6,11 @@ import {
   SHOPS,
   getShopName,
   PART_SIDES,
-  demoInventory,
-  demoSuppliers,
-  demoPurchaseOrders,
-  demoStockMovements,
-  demoSales,
-  demoExpenses,
-  demoSettings,
+  defaultSettings,
   getSupabaseClient,
-  loadDashboardData,
+  loadSparesLight,
+  loadSpareImages,
+  loadSecondaryData,
   loginAdmin,
   saveAdminSettings,
   uploadSparePartImage,
@@ -33,6 +29,12 @@ import {
   updateSparePartPrices,
   clearShopData,
 } from './supabase';
+import {
+  getCachedBundle,
+  saveCachedBundle,
+  getCachedImages,
+  saveCachedImages,
+} from './dataCache';
 
 const categories = ['All', 'Body', 'Electrical', 'Mechanical'];
 const CONTACT_PHONE = '0722123232';
@@ -102,7 +104,7 @@ const emptyCostForm = {
   newSalePrice: 0,
 };
 
-const demoDataKey = 'autospares-demo-data-v1';
+const legacyDemoDataKey = 'autospares-demo-data-v1';
 const selectedShopKey = 'autospares-selected-shop-v1';
 const themeKey = 'autospares-theme-v1';
 
@@ -122,33 +124,6 @@ const getSavedShop = () => {
     return null;
   }
 };
-
-const getSavedDemoData = () => {
-  try {
-    const raw = localStorage.getItem(demoDataKey);
-    return raw ? JSON.parse(raw) : null;
-  } catch (error) {
-    return null;
-  }
-};
-
-const saveDemoData = (bundle) => {
-  try {
-    localStorage.setItem(demoDataKey, JSON.stringify(bundle));
-  } catch (error) {
-    console.warn('Unable to save demo data locally:', error.message);
-  }
-};
-
-const buildDemoBundle = (settingsOverride = null) => ({
-  inventory: demoInventory,
-  sales: demoSales,
-  expenses: demoExpenses,
-  suppliers: demoSuppliers,
-  purchaseOrders: demoPurchaseOrders,
-  stockMovements: demoStockMovements,
-  settings: settingsOverride || demoSettings,
-});
 
 function App() {
   const [allInventory, setAllInventory] = useState([]);
@@ -180,7 +155,15 @@ function App() {
   const [adminLogin, setAdminLogin] = useState(emptyAdminLogin);
   const [editingItemId, setEditingItemId] = useState(null);
   const [statusMessage, setStatusMessage] = useState('');
-  const [supabaseEnabled, setSupabaseEnabled] = useState(false);
+  // True when the Supabase environment variables are present (no more demo mode).
+  const [supabaseEnabled, setSupabaseEnabled] = useState(() => Boolean(getSupabaseClient()));
+  const [dataLoading, setDataLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [dataReady, setDataReady] = useState(false);
+  // id -> image url. undefined = still loading, '' = this part has no image.
+  const [imageMap, setImageMap] = useState({});
+  const requestedImagesRef = useRef(new Set());
+  const loadAllRef = useRef(null);
   const [adminAuthenticated, setAdminAuthenticated] = useState(false);
   const [adminSection, setAdminSection] = useState('stock');
   const [supplierQuery, setSupplierQuery] = useState('');
@@ -227,35 +210,70 @@ function App() {
 
   const applyDataBundle = (bundle) => {
     const nextSettings = {
-      ...demoSettings,
+      ...defaultSettings,
       ...(bundle?.settings || {}),
     };
 
-    const nextInventory = Array.isArray(bundle?.inventory) ? bundle.inventory : [];
-    const nextSales = Array.isArray(bundle?.sales) ? bundle.sales : [];
-    const nextExpenses = Array.isArray(bundle?.expenses) ? bundle.expenses : [];
-    const nextSuppliers = Array.isArray(bundle?.suppliers) ? bundle.suppliers : [];
-    const nextPurchaseOrders = Array.isArray(bundle?.purchaseOrders) ? bundle.purchaseOrders : [];
-    const nextStockMovements = Array.isArray(bundle?.stockMovements) ? bundle.stockMovements : [];
-
-    setAllInventory(nextInventory);
-    setAllSales(nextSales);
-    setAllExpenses(nextExpenses);
-    setAllSuppliers(nextSuppliers);
-    setAllPurchaseOrders(nextPurchaseOrders);
-    setAllStockMovements(nextStockMovements);
+    setAllInventory(Array.isArray(bundle?.inventory) ? bundle.inventory : []);
+    setAllSales(Array.isArray(bundle?.sales) ? bundle.sales : []);
+    setAllExpenses(Array.isArray(bundle?.expenses) ? bundle.expenses : []);
+    setAllSuppliers(Array.isArray(bundle?.suppliers) ? bundle.suppliers : []);
+    setAllPurchaseOrders(Array.isArray(bundle?.purchaseOrders) ? bundle.purchaseOrders : []);
+    setAllStockMovements(Array.isArray(bundle?.stockMovements) ? bundle.stockMovements : []);
     setSettings(nextSettings);
     setAdminForm(nextSettings);
-    saveDemoData({
-      inventory: nextInventory,
-      sales: nextSales,
-      expenses: nextExpenses,
-      suppliers: nextSuppliers,
-      purchaseOrders: nextPurchaseOrders,
-      stockMovements: nextStockMovements,
-      settings: nextSettings,
-    });
   };
+
+  const mergeImages = (map) => {
+    if (!map || !Object.keys(map).length) return;
+    setImageMap((previous) => ({ ...previous, ...map }));
+  };
+
+  // Loads images for these part ids: memory -> IndexedDB (instant) -> network (refresh).
+  const loadImagesFor = async (ids) => {
+    const needed = ids.filter((id) => !requestedImagesRef.current.has(id));
+    if (!needed.length) return;
+    needed.forEach((id) => requestedImagesRef.current.add(id));
+
+    const cached = await getCachedImages(needed);
+    mergeImages(cached);
+
+    for (let i = 0; i < needed.length; i += 50) {
+      const chunk = needed.slice(i, i + 50);
+      const fresh = await loadSpareImages(chunk);
+      if (fresh) {
+        chunk.forEach((id) => {
+          if (!(id in fresh)) fresh[id] = '';
+        });
+        mergeImages(fresh);
+        saveCachedImages(fresh);
+      } else {
+        // network problem: keep cached images, show the placeholder for the rest, retry next time
+        const fallback = {};
+        chunk.forEach((id) => {
+          if (!(id in cached)) fallback[id] = '';
+          requestedImagesRef.current.delete(id);
+        });
+        mergeImages(fallback);
+      }
+    }
+  };
+
+  // Short image URLs arrive with the list, so mark them as already known.
+  // Only inline base64 images (rare) are fetched later, per visible page.
+  const seedImages = (items) => {
+    const map = {};
+    items.forEach((item) => {
+      const url = item.imageUrl || '';
+      if (url && !url.startsWith('data:')) {
+        map[item.id] = url;
+        requestedImagesRef.current.add(item.id);
+      }
+    });
+    mergeImages(map);
+  };
+
+  const imageFor = (item) => (item.id in imageMap ? imageMap[item.id] : item.imageUrl || undefined);
 
   const inventory = useMemo(
     () => allInventory.filter((item) => item.shop === selectedShop),
@@ -359,21 +377,66 @@ function App() {
   );
 
   useEffect(() => {
-    const fetchData = async () => {
-      const savedDemoBundle = getSavedDemoData();
-      const result = await loadDashboardData();
-      const normalizedSettings = result.data.settings || settings;
-      const activeBundle = result.enabled ? result.data : (savedDemoBundle || result.data);
+    try {
+      localStorage.removeItem(legacyDemoDataKey);
+    } catch (error) {
+      // ignore
+    }
 
-      applyDataBundle(activeBundle);
-      setSupabaseEnabled(result.enabled);
+    const loadAll = async () => {
+      setLoadError('');
+
+      if (!getSupabaseClient()) {
+        setSupabaseEnabled(false);
+        setLoadError('Supabase is not configured. Add REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY and rebuild.');
+        setDataLoading(false);
+        return;
+      }
+      setSupabaseEnabled(true);
+
+      // 1) Show the last saved copy instantly (IndexedDB).
+      const cached = await getCachedBundle();
+      if (cached && Array.isArray(cached.inventory) && cached.inventory.length) {
+        applyDataBundle(cached);
+        seedImages(cached.inventory);
+        setDataReady(true);
+        setDataLoading(false);
+      }
+
+      // 2) Start both downloads at once; the spares are shown the moment they arrive.
+      const sparesPromise = loadSparesLight();
+      const secondaryPromise = loadSecondaryData();
+
+      const spares = await sparesPromise;
+      if (spares.error) {
+        if (!cached) setLoadError(`Could not load spare parts: ${spares.error}`);
+      } else {
+        setAllInventory(spares.inventory);
+        seedImages(spares.inventory);
+        setDataReady(true);
+      }
+      setDataLoading(false);
+
+      // 3) Sales, expenses, suppliers, ... fill in the background.
+      const secondary = await secondaryPromise;
+      let currentSettings = settings;
+      if (!secondary.error) {
+        setAllSales(secondary.sales);
+        setAllExpenses(secondary.expenses);
+        setAllSuppliers(secondary.suppliers);
+        setAllPurchaseOrders(secondary.purchaseOrders);
+        setAllStockMovements(secondary.stockMovements);
+        currentSettings = { ...defaultSettings, ...secondary.settings };
+        setSettings(currentSettings);
+        setAdminForm(currentSettings);
+      }
 
       const supabase = getSupabaseClient();
       if (supabase && supabase.auth && supabase.auth.getUser) {
         try {
           const { data, error } = await supabase.auth.getUser();
           if (!error && data?.user) {
-            const allowedAdmin = (normalizedSettings.adminEmail || normalizedSettings.admin_email || '').trim().toLowerCase();
+            const allowedAdmin = (currentSettings.adminEmail || currentSettings.admin_email || '').trim().toLowerCase();
             const currentEmail = (data.user.email || '').trim().toLowerCase();
             setAdminAuthenticated(Boolean(allowedAdmin) && currentEmail === allowedAdmin);
           } else {
@@ -386,9 +449,30 @@ function App() {
       }
     };
 
-    fetchData();
+    loadAllRef.current = loadAll;
+    loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Save a copy to IndexedDB so the next visit shows instantly.
+  useEffect(() => {
+    if (!dataReady) return undefined;
+    const timer = setTimeout(() => {
+      saveCachedBundle({
+        inventory: allInventory.map((item) => ({
+          ...item,
+          imageUrl: item.imageUrl && item.imageUrl.startsWith('data:') ? '' : (item.imageUrl || ''),
+        })),
+        sales: allSales,
+        expenses: allExpenses,
+        suppliers: allSuppliers,
+        purchaseOrders: allPurchaseOrders,
+        stockMovements: allStockMovements,
+        settings,
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [dataReady, allInventory, allSales, allExpenses, allSuppliers, allPurchaseOrders, allStockMovements, settings]);
 
   const filteredInventory = useMemo(() => {
     const normalizedSearch = searchTerm.toLowerCase().trim();
@@ -421,6 +505,16 @@ function App() {
     const start = (inventoryPage - 1) * INVENTORY_PAGE_SIZE;
     return filteredInventory.slice(start, start + INVENTORY_PAGE_SIZE);
   }, [filteredInventory, inventoryPage, isPrinting]);
+
+  // Fetch images only for the page on screen (then quietly for the next page).
+  useEffect(() => {
+    if (!dataReady) return;
+    const ids = paginatedInventory.map((item) => item.id);
+    const start = inventoryPage * INVENTORY_PAGE_SIZE;
+    const nextIds = filteredInventory.slice(start, start + INVENTORY_PAGE_SIZE).map((item) => item.id);
+    loadImagesFor(ids).then(() => loadImagesFor(nextIds));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataReady, paginatedInventory, filteredInventory, inventoryPage]);
 
   const totalSales = sales.reduce((sum, sale) => sum + Number(sale.amount || 0), 0);
   const totalExpenses = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
@@ -517,7 +611,7 @@ function App() {
     setStatusMessage(
       result.success
         ? 'Settings saved successfully.'
-        : 'Demo mode active. Add Supabase environment variables to store admin settings.'
+        : `Could not save settings: ${result.error || 'check your Supabase connection.'}`
     );
   };
 
@@ -559,23 +653,6 @@ function App() {
     setAllSuppliers(bundle.suppliers);
     setAllPurchaseOrders(bundle.purchaseOrders);
     setAllStockMovements(bundle.stockMovements);
-    saveDemoData({ ...bundle, settings });
-  };
-
-  const handleLoadDemoData = () => {
-    const shopDemoBundle = buildDemoBundle(settings);
-    const belongsToOtherShop = (record) => record.shop !== selectedShop;
-    const belongsToThisShop = (record) => record.shop === selectedShop;
-
-    persistAllData({
-      inventory: [...allInventory.filter(belongsToOtherShop), ...shopDemoBundle.inventory.filter(belongsToThisShop)],
-      sales: [...allSales.filter(belongsToOtherShop), ...shopDemoBundle.sales.filter(belongsToThisShop)],
-      expenses: [...allExpenses.filter(belongsToOtherShop), ...shopDemoBundle.expenses.filter(belongsToThisShop)],
-      suppliers: [...allSuppliers.filter(belongsToOtherShop), ...shopDemoBundle.suppliers.filter(belongsToThisShop)],
-      purchaseOrders: [...allPurchaseOrders.filter(belongsToOtherShop), ...shopDemoBundle.purchaseOrders.filter(belongsToThisShop)],
-      stockMovements: [...allStockMovements.filter(belongsToOtherShop), ...shopDemoBundle.stockMovements.filter(belongsToThisShop)],
-    });
-    setStatusMessage(`Demo data restored for ${getShopName(selectedShop)}.`);
   };
 
   const handleClearAllData = async () => {
@@ -801,13 +878,17 @@ function App() {
       });
     }
 
+    mergeImages({ [savedItem.id]: savedItem.imageUrl || '' });
+    saveCachedImages({ [savedItem.id]: savedItem.imageUrl || '' });
+    requestedImagesRef.current.add(savedItem.id);
+
     if (editingItemId) {
       setAllInventory((previous) =>
-        previous.map((item) => (String(item.id) === String(editingItemId) ? savedItem : item))
+        previous.map((item) => (String(item.id) === String(editingItemId) ? { ...savedItem, imageUrl: (savedItem.imageUrl || '').startsWith('data:') ? '' : savedItem.imageUrl } : item))
       );
       setStatusMessage('Spare part updated successfully.');
     } else {
-      setAllInventory((previous) => [savedItem, ...previous]);
+      setAllInventory((previous) => [{ ...savedItem, imageUrl: (savedItem.imageUrl || '').startsWith('data:') ? '' : savedItem.imageUrl }, ...previous]);
       setStatusMessage('Spare part added successfully.');
     }
 
@@ -838,7 +919,7 @@ function App() {
       model: item.model || '',
       side: item.side || 'N/A',
       supplier: item.supplier || '',
-      imageUrl: item.imageUrl || '',
+      imageUrl: imageFor(item) || '',
       stock: Number(item.stock) || 0,
       cost: Number(item.cost) || 0,
       salePrice: Number(item.salePrice) || 0,
@@ -1440,8 +1521,8 @@ function App() {
         </div>
 
         <div className="status-chip">
-          <span className={`dot ${supabaseEnabled ? 'online' : 'offline'}`} />
-          {supabaseEnabled ? 'Supabase connected' : 'Demo mode'}
+          <span className={`dot ${supabaseEnabled && !loadError ? 'online' : 'offline'}`} />
+          {loadError ? 'Connection problem' : dataLoading ? 'Loading…' : 'Supabase connected'}
         </div>
       </aside>
 
@@ -1635,31 +1716,51 @@ function App() {
               />
             </div>
 
+            {loadError && (
+              <div className="panel" style={{ margin: '12px 0', padding: '12px 16px', border: '1px solid #dc2626' }}>
+                <strong>⚠️ {loadError}</strong>
+                <div style={{ marginTop: 8 }}>
+                  <button type="button" className="primary-btn small" onClick={() => loadAllRef.current && loadAllRef.current()}>
+                    Retry
+                  </button>
+                </div>
+              </div>
+            )}
+            {dataLoading && !loadError && <p className="status-message">Loading spare parts…</p>}
+
             <section className="inventory-grid">
               {filteredInventory.length > 0 ? paginatedInventory.map((item) => {
                 const isLow = Number(item.stock) <= Number(item.reorderLevel || settings.minimumStockAlert);
-                const hasImage = item.imageUrl && item.imageUrl.trim().length > 0;
+                const itemImage = imageFor(item);
+                const imageLoading = itemImage === undefined;
+                const hasImage = Boolean(itemImage && itemImage.trim().length > 0);
                 const fallbackImage = 'https://images.unsplash.com/photo-1489824904134-891ab64532f1?auto=format&fit=crop&w=900&q=80';
                 return (
                   <article 
                     key={item.id} 
                     className={`inventory-card ${isLow ? 'warning' : ''}`}
-                    title={hasImage ? `Image URL: ${item.imageUrl}` : 'No custom image URL stored'}
+                    title={hasImage ? 'Custom image' : 'No custom image stored'}
                   >
                     <div 
                       className="part-image-container"
-                      onClick={() => setZoomedImage({ url: hasImage ? item.imageUrl : fallbackImage, title: `${item.brand} ${item.name}` })}
+                      onClick={() => setZoomedImage({ url: hasImage ? itemImage : fallbackImage, title: `${item.brand} ${item.name}` })}
                       style={{ cursor: 'zoom-in' }}
                       title="Click to expand & view full-size image"
                     >
-                      <img
-                        src={hasImage ? item.imageUrl : fallbackImage}
-                        alt={item.name}
-                        className="part-image"
-                        onError={(e) => {
-                          e.target.src = fallbackImage;
-                        }}
-                      />
+                      {imageLoading ? (
+                        <div className="part-image" style={{ background: 'rgba(127,127,127,0.18)' }} aria-label="Loading image" />
+                      ) : (
+                        <img
+                          src={hasImage ? itemImage : fallbackImage}
+                          alt={item.name}
+                          className="part-image"
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => {
+                            e.target.src = fallbackImage;
+                          }}
+                        />
+                      )}
                       {hasImage && (
                         <div style={{
                           position: 'absolute',
@@ -2508,13 +2609,12 @@ function App() {
 
                 {adminSection === 'data' && (
                   <div className="panel inventory-manager">
-                    <h3>Demo Data Controls</h3>
+                    <h3>Data Controls</h3>
                     <p className="status-message">
-                      Use these buttons to wipe everything and start fresh, or reload the default starter stock list.
+                      Permanently delete all data for this shop. The other shop's data is kept.
                     </p>
                     <div className="button-row">
                       <button type="button" className="danger-btn" onClick={handleClearAllData}>Clear all data</button>
-                      <button type="button" className="primary-btn" onClick={handleLoadDemoData}>Load demo data</button>
                     </div>
                   </div>
                 )}

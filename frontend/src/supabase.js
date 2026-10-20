@@ -11,131 +11,7 @@ export const getShopName = (shopId) => SHOPS.find((shop) => shop.id === shopId)?
 
 export const PART_SIDES = ['N/A', 'Left', 'Right'];
 
-export const demoInventory = [
-  {
-    id: 1,
-    shop: 'velll',
-    name: 'Toyota Corolla Engine Gasket Set',
-    category: 'Mechanical',
-    brand: 'Toyota',
-    model: 'Corolla',
-    side: 'N/A',
-    supplier: 'Motorline Kenya',
-    imageUrl: 'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&w=900&q=80',
-    stock: 18,
-    cost: 980,
-    salePrice: 1680,
-    reorderLevel: 6,
-  },
-  {
-    id: 2,
-    shop: 'bana',
-    name: 'Mazda 323 Timing Belt Kit',
-    category: 'Mechanical',
-    brand: 'Mazda',
-    model: '323',
-    side: 'N/A',
-    supplier: 'AutoDrive Suppliers',
-    imageUrl: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=900&q=80',
-    stock: 5,
-    cost: 1200,
-    salePrice: 2100,
-    reorderLevel: 7,
-  },
-  {
-    id: 3,
-    shop: 'velll',
-    name: 'Honda Civic Brake Pad Set',
-    category: 'Mechanical',
-    brand: 'Honda',
-    model: 'Civic',
-    side: 'N/A',
-    supplier: 'BrakeMax',
-    imageUrl: 'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=900&q=80',
-    stock: 10,
-    cost: 740,
-    salePrice: 1400,
-    reorderLevel: 5,
-  },
-  {
-    id: 4,
-    shop: 'bana',
-    name: 'Nissan Sentra Starter Motor',
-    category: 'Electrical',
-    brand: 'Nissan',
-    model: 'Sentra',
-    side: 'N/A',
-    supplier: 'Powerline Motors',
-    imageUrl: 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=900&q=80',
-    stock: 3,
-    cost: 2300,
-    salePrice: 4200,
-    reorderLevel: 4,
-  },
-  {
-    id: 5,
-    shop: 'velll',
-    name: 'Ford Ranger Suspension Kit',
-    category: 'Mechanical',
-    brand: 'Ford',
-    model: 'Ranger',
-    side: 'N/A',
-    supplier: 'RidePro',
-    imageUrl: 'https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=900&q=80',
-    stock: 8,
-    cost: 1900,
-    salePrice: 3200,
-    reorderLevel: 5,
-  },
-  {
-    id: 6,
-    shop: 'bana',
-    name: 'Volkswagen Polo Clutch Kit',
-    category: 'Mechanical',
-    brand: 'Volkswagen',
-    model: 'Polo',
-    side: 'N/A',
-    supplier: 'DriveCore',
-    imageUrl: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=900&q=80',
-    stock: 12,
-    cost: 1650,
-    salePrice: 2900,
-    reorderLevel: 6,
-  },
-];
-
-export const demoSuppliers = [
-  { id: 1, shop: 'velll', name: 'Motorline Kenya', contact: 'Jane', phone: '+254700111222', email: 'sales@motorline.co.ke' },
-  { id: 2, shop: 'bana', name: 'AutoDrive Suppliers', contact: 'Alex', phone: '+254712222333', email: 'orders@autodrive.co.ke' },
-  { id: 3, shop: 'bana', name: 'Powerline Motors', contact: 'Mary', phone: '+254723333444', email: 'support@powerline.co.ke' },
-];
-
-export const demoPurchaseOrders = [
-  { id: 1, shop: 'velll', supplierId: 1, supplierName: 'Motorline Kenya', itemId: 1, itemName: 'Toyota Corolla Engine Gasket Set', quantity: 8, unitCost: 900, orderDate: '2026-08-01', status: 'Received' },
-  { id: 2, shop: 'bana', supplierId: 2, supplierName: 'AutoDrive Suppliers', itemId: 2, itemName: 'Mazda 323 Timing Belt Kit', quantity: 5, unitCost: 1180, orderDate: '2026-08-04', status: 'Pending' },
-];
-
-export const demoStockMovements = [
-  { id: 1, shop: 'velll', type: 'Stock In', itemName: 'Toyota Corolla Engine Gasket Set', quantity: 8, date: '2026-08-01', note: 'Purchase order received' },
-  { id: 2, shop: 'velll', type: 'Sale', itemName: 'Honda Civic Brake Pad Set', quantity: -2, date: '2026-08-06', note: 'Customer sale' },
-  { id: 3, shop: 'velll', type: 'Stock Adjustment', itemName: 'Ford Ranger Suspension Kit', quantity: -1, date: '2026-08-10', note: 'Returned item' },
-  { id: 4, shop: 'bana', type: 'Stock In', itemName: 'Mazda 323 Timing Belt Kit', quantity: 5, date: '2026-08-04', note: 'Purchase order received' },
-];
-
-export const demoSales = [
-  { id: 1, shop: 'velll', item: 'Toyota Corolla Engine Gasket Set', amount: 1680, quantity: 1, cost: 980, date: '2026-08-06' },
-  { id: 2, shop: 'velll', item: 'Honda Civic Brake Pad Set', amount: 1400, quantity: 1, cost: 740, date: '2026-08-08' },
-  { id: 3, shop: 'velll', item: 'Ford Ranger Suspension Kit', amount: 3200, quantity: 1, cost: 1900, date: '2026-08-10' },
-  { id: 4, shop: 'bana', item: 'Mazda 323 Timing Belt Kit', amount: 2100, quantity: 1, cost: 1200, date: '2026-08-11' },
-];
-
-export const demoExpenses = [
-  { id: 1, shop: 'velll', type: 'Installation Labour', amount: 950, note: 'Toyota gasket installation' },
-  { id: 2, shop: 'bana', type: 'Motorbike Delivery', amount: 420, note: 'Customer delivery to Kijabe' },
-  { id: 3, shop: 'velll', type: 'Part Reordering', amount: 680, note: 'Brake pad restocking' },
-];
-
-export const demoSettings = {
+export const defaultSettings = {
   businessName: 'AutoSpare Pro',
   currency: 'KES',
   deliveryAllowance: 500,
@@ -223,7 +99,10 @@ export const normalizeStockMovement = (record = {}) => ({
   note: record.note ?? '',
 });
 
+let cachedClient = null;
+
 export const getSupabaseClient = () => {
+  if (cachedClient) return cachedClient;
   const url = process.env.REACT_APP_SUPABASE_URL;
   const anonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
@@ -232,14 +111,15 @@ export const getSupabaseClient = () => {
     return null;
   }
 
-  return createClient(url, anonKey);
+  cachedClient = createClient(url, anonKey);
+  return cachedClient;
 };
 
 export async function loginAdmin(email, password) {
   const supabase = getSupabaseClient();
 
   if (!supabase || !supabase.auth) {
-    return { success: false, error: 'Supabase client unavailable.', mode: 'demo' };
+    return { success: false, error: 'Supabase client unavailable.', mode: 'offline' };
   }
 
   try {
@@ -267,7 +147,7 @@ export async function uploadSparePartImage(file, partId) {
 
   try {
     const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    const { error } = await supabase.storage.from(bucketName).upload(fileName, file);
+    const { error } = await supabase.storage.from(bucketName).upload(fileName, file, { cacheControl: '31536000' });
 
     if (error) throw error;
 
@@ -284,75 +164,111 @@ export async function uploadSparePartImage(file, partId) {
   }
 }
 
-export async function loadDashboardData() {
-  const supabase = getSupabaseClient();
+// ----------------------------------------------------
+// Fast loading helpers
+// ----------------------------------------------------
 
-  if (!supabase) {
-    return {
-      data: {
-        inventory: demoInventory,
-        sales: demoSales,
-        expenses: demoExpenses,
-        suppliers: demoSuppliers,
-        purchaseOrders: demoPurchaseOrders,
-        stockMovements: demoStockMovements,
-        settings: demoSettings,
-      },
-      enabled: false,
-    };
+// image_url is NOT in the list query: if any row holds a big inline (base64) image,
+// reading it makes the query slow enough to hit Supabase's statement timeout.
+// Images are fetched separately, only for the parts on screen.
+export const SPARE_LIGHT_COLUMNS =
+  'id,shop,name,category,brand,model,side,supplier,stock,cost,sale_price,reorder_level';
+
+const CHUNK = 500; // small chunks keep every request well under the timeout
+const PARALLEL = 4; // chunks requested at the same time
+
+// Downloads a whole table in small chunks, several at a time, without a slow COUNT.
+async function fetchAllRows(table, columns = '*') {
+  const supabase = getSupabaseClient();
+  const rows = [];
+  let batchStart = 0;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const jobs = [];
+    for (let i = 0; i < PARALLEL; i += 1) {
+      const from = batchStart + i * CHUNK;
+      jobs.push(
+        supabase.from(table).select(columns).order('id', { ascending: false }).range(from, from + CHUNK - 1)
+      );
+    }
+    const results = await Promise.all(jobs);
+    let lastWasFull = true;
+    for (const res of results) {
+      if (res.error) throw res.error;
+      const data = res.data || [];
+      rows.push(...data);
+      lastWasFull = data.length === CHUNK;
+      if (!lastWasFull) break;
+    }
+    if (!lastWasFull) break;
+    batchStart += PARALLEL * CHUNK;
   }
+  return rows;
+}
+
+// Step 1: spare parts WITHOUT images - small and fast, shown first.
+export async function loadSparesLight() {
+  if (!getSupabaseClient()) return { error: 'Supabase environment variables are missing.', inventory: [] };
+  try {
+    const rows = await fetchAllRows('spares', SPARE_LIGHT_COLUMNS);
+    return { inventory: rows.map(normalizeSparePart) };
+  } catch (error) {
+    console.warn('Supabase spares load error:', error.message);
+    return { error: error.message, inventory: [] };
+  }
+}
+
+// Step 2: images for just the parts on screen. Returns { [id]: imageUrl }.
+export async function loadSpareImages(ids = []) {
+  const supabase = getSupabaseClient();
+  if (!supabase || !ids.length) return {};
+  try {
+    const { data, error } = await supabase.from('spares').select('id,image_url').in('id', ids);
+    if (error) throw error;
+    const map = {};
+    (data || []).forEach((row) => {
+      map[row.id] = row.image_url || '';
+    });
+    return map;
+  } catch (error) {
+    console.warn('Supabase image load error:', error.message);
+    return null;
+  }
+}
+
+// Step 3: everything else (sales, expenses, ...), loaded in the background.
+export async function loadSecondaryData() {
+  const supabase = getSupabaseClient();
+  if (!supabase) return { error: 'Supabase environment variables are missing.' };
 
   try {
-    const [inventoryRes, salesRes, expensesRes, suppliersRes, purchaseOrdersRes, stockMovementsRes, settingsRes] = await Promise.all([
-      supabase.from('spares').select('*').order('id', { ascending: false }),
-      supabase.from('sales').select('*').order('id', { ascending: false }),
-      supabase.from('expenses').select('*').order('id', { ascending: false }),
-      supabase.from('suppliers').select('*').order('id', { ascending: false }),
-      supabase.from('purchase_orders').select('*').order('id', { ascending: false }),
-      supabase.from('stock_movements').select('*').order('id', { ascending: false }),
+    const [sales, expenses, suppliers, purchaseOrders, stockMovements, settingsRes] = await Promise.all([
+      fetchAllRows('sales'),
+      fetchAllRows('expenses'),
+      fetchAllRows('suppliers'),
+      fetchAllRows('purchase_orders'),
+      fetchAllRows('stock_movements'),
       supabase.from('settings').select('*').maybeSingle(),
     ]);
 
-    if (inventoryRes.error) console.warn('Supabase spares table warning:', inventoryRes.error.message);
-    if (salesRes.error) console.warn('Supabase sales table warning:', salesRes.error.message);
-    if (expensesRes.error) console.warn('Supabase expenses table warning:', expensesRes.error.message);
-    if (suppliersRes.error) console.warn('Supabase suppliers table warning:', suppliersRes.error.message);
-    if (purchaseOrdersRes.error) console.warn('Supabase purchase_orders table warning:', purchaseOrdersRes.error.message);
-    if (stockMovementsRes.error) console.warn('Supabase stock_movements table warning:', stockMovementsRes.error.message);
-
     return {
-      data: {
-        inventory: inventoryRes.data ? inventoryRes.data.map(normalizeSparePart) : [],
-        sales: salesRes.data ? salesRes.data.map(normalizeSale) : [],
-        expenses: expensesRes.data ? expensesRes.data.map(normalizeExpense) : [],
-        suppliers: suppliersRes.data ? suppliersRes.data.map(normalizeSupplier) : [],
-        purchaseOrders: purchaseOrdersRes.data ? purchaseOrdersRes.data.map(normalizePurchaseOrder) : [],
-        stockMovements: stockMovementsRes.data ? stockMovementsRes.data.map(normalizeStockMovement) : [],
-        settings: normalizeSettings(settingsRes.data || demoSettings),
-      },
-      enabled: true,
+      sales: sales.map(normalizeSale),
+      expenses: expenses.map(normalizeExpense),
+      suppliers: suppliers.map(normalizeSupplier),
+      purchaseOrders: purchaseOrders.map(normalizePurchaseOrder),
+      stockMovements: stockMovements.map(normalizeStockMovement),
+      settings: normalizeSettings(settingsRes.data || defaultSettings),
     };
   } catch (error) {
     console.warn('Supabase data load error:', error.message);
-    return {
-      data: {
-        inventory: demoInventory,
-        sales: demoSales,
-        expenses: demoExpenses,
-        suppliers: demoSuppliers,
-        purchaseOrders: demoPurchaseOrders,
-        stockMovements: demoStockMovements,
-        settings: demoSettings,
-      },
-      enabled: true,
-      error: error.message,
-    };
+    return { error: error.message };
   }
 }
 
 export async function saveAdminSettings(settings) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: true, mode: 'demo' };
+  if (!supabase) return { success: false, error: 'Supabase is not configured.', mode: 'offline' };
 
   try {
     const payload = {
@@ -381,7 +297,7 @@ export async function saveAdminSettings(settings) {
 
 export async function saveSparePart(item) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, mode: 'demo' };
+  if (!supabase) return { success: false, mode: 'offline' };
 
   const payload = {
     shop: item.shop || DEFAULT_SHOP_ID,
@@ -417,7 +333,7 @@ export async function saveSparePart(item) {
 
 export async function deleteSparePart(id) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, mode: 'demo' };
+  if (!supabase) return { success: false, mode: 'offline' };
 
   try {
     const { error } = await supabase.from('spares').delete().eq('id', id);
@@ -431,7 +347,7 @@ export async function deleteSparePart(id) {
 
 export async function saveSale(sale) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, mode: 'demo' };
+  if (!supabase) return { success: false, mode: 'offline' };
 
   const payload = {
     shop: sale.shop || DEFAULT_SHOP_ID,
@@ -469,7 +385,7 @@ export async function saveSale(sale) {
 
 export async function deleteSale(id) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, mode: 'demo' };
+  if (!supabase) return { success: false, mode: 'offline' };
 
   try {
     const { error } = await supabase.from('sales').delete().eq('id', id);
@@ -483,7 +399,7 @@ export async function deleteSale(id) {
 
 export async function saveExpense(expense) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, mode: 'demo' };
+  if (!supabase) return { success: false, mode: 'offline' };
 
   const payload = {
     shop: expense.shop || DEFAULT_SHOP_ID,
@@ -525,7 +441,7 @@ export async function saveExpense(expense) {
 
 export async function deleteExpense(id) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, mode: 'demo' };
+  if (!supabase) return { success: false, mode: 'offline' };
 
   try {
     const { error } = await supabase.from('expenses').delete().eq('id', id);
@@ -539,7 +455,7 @@ export async function deleteExpense(id) {
 
 export async function saveSupplier(supplier) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, mode: 'demo' };
+  if (!supabase) return { success: false, mode: 'offline' };
 
   const payload = {
     shop: supplier.shop || DEFAULT_SHOP_ID,
@@ -567,7 +483,7 @@ export async function saveSupplier(supplier) {
 
 export async function deleteSupplier(id) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, mode: 'demo' };
+  if (!supabase) return { success: false, mode: 'offline' };
 
   try {
     const { error } = await supabase.from('suppliers').delete().eq('id', id);
@@ -581,7 +497,7 @@ export async function deleteSupplier(id) {
 
 export async function savePurchaseOrder(order) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, mode: 'demo' };
+  if (!supabase) return { success: false, mode: 'offline' };
 
   const payload = {
     shop: order.shop || DEFAULT_SHOP_ID,
@@ -613,7 +529,7 @@ export async function savePurchaseOrder(order) {
 
 export async function deletePurchaseOrder(id) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, mode: 'demo' };
+  if (!supabase) return { success: false, mode: 'offline' };
 
   try {
     const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
@@ -627,7 +543,7 @@ export async function deletePurchaseOrder(id) {
 
 export async function saveStockMovement(movement) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, mode: 'demo' };
+  if (!supabase) return { success: false, mode: 'offline' };
 
   const payload = {
     shop: movement.shop || DEFAULT_SHOP_ID,
@@ -650,14 +566,14 @@ export async function saveStockMovement(movement) {
 
 export async function updateSparePartStock(id, newStock) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, mode: 'demo' };
+  if (!supabase) return { success: false, mode: 'offline' };
 
   try {
     const { data, error } = await supabase
       .from('spares')
       .update({ stock: Math.max(0, Number(newStock)) })
       .eq('id', id)
-      .select()
+      .select(SPARE_LIGHT_COLUMNS)
       .single();
 
     if (error) throw error;
@@ -670,14 +586,14 @@ export async function updateSparePartStock(id, newStock) {
 
 export async function updateSparePartPrices(id, cost, salePrice) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, mode: 'demo' };
+  if (!supabase) return { success: false, mode: 'offline' };
 
   try {
     const { data, error } = await supabase
       .from('spares')
       .update({ cost: Number(cost), sale_price: Number(salePrice) })
       .eq('id', id)
-      .select()
+      .select(SPARE_LIGHT_COLUMNS)
       .single();
 
     if (error) throw error;
@@ -690,7 +606,7 @@ export async function updateSparePartPrices(id, cost, salePrice) {
 
 export async function clearShopData(shopId) {
   const supabase = getSupabaseClient();
-  if (!supabase) return { success: false, mode: 'demo' };
+  if (!supabase) return { success: false, mode: 'offline' };
 
   const tables = ['stock_movements', 'purchase_orders', 'sales', 'expenses', 'suppliers', 'spares'];
 
