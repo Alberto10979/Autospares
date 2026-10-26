@@ -49,6 +49,31 @@ const expenseTypes = ['Installation Labour', 'Motorbike Delivery', 'Part Reorder
 
 const makeToday = () => new Date().toISOString().slice(0, 10);
 
+// "Toyota Brake Pad (Left)" - same label the sale form and sales list use.
+const getPartLabel = (item) =>
+  `${item.brand} ${item.name}${item.side && item.side !== 'N/A' ? ` (${item.side})` : ''}`;
+
+// Inline styles for the part search list (neutral colours, work in light and dark theme).
+const partSearchListStyle = {
+  listStyle: 'none',
+  margin: '4px 0 10px',
+  padding: 0,
+  maxHeight: '220px',
+  overflowY: 'auto',
+  border: '1px solid rgba(127, 127, 127, 0.35)',
+  borderRadius: '8px',
+};
+const partSearchRowStyle = (active) => ({
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: '12px',
+  padding: '8px 10px',
+  cursor: 'pointer',
+  background: active ? 'rgba(127, 127, 127, 0.22)' : 'transparent',
+  borderBottom: '1px solid rgba(127, 127, 127, 0.15)',
+});
+
 const emptyStockForm = {
   name: '',
   category: 'Mechanical',
@@ -149,6 +174,10 @@ function App() {
   const [adminForm, setAdminForm] = useState(settings);
   const [stockForm, setStockForm] = useState(emptyStockForm);
   const [saleForm, setSaleForm] = useState(emptySaleForm);
+  // Text typed in the Add Sale part search, whether its result list is open, and the keyboard-highlighted row.
+  const [saleSearch, setSaleSearch] = useState('');
+  const [saleSearchOpen, setSaleSearchOpen] = useState(false);
+  const [saleHighlight, setSaleHighlight] = useState(0);
   const [expenseForm, setExpenseForm] = useState(emptyExpenseForm);
   const [supplierForm, setSupplierForm] = useState(emptySupplierForm);
   const [purchaseForm, setPurchaseForm] = useState(emptyPurchaseForm);
@@ -603,6 +632,29 @@ function App() {
     return haystack.includes(costQuery.toLowerCase());
   });
 
+  // Parts matching the Add Sale search: every word typed must appear in brand/name/model/side/category.
+  const saleMatches = (() => {
+    if (!saleSearchOpen) return [];
+    const tokens = saleSearch.toLowerCase().split(/\s+/).filter(Boolean);
+    const pool = tokens.length
+      ? inventory.filter((item) => {
+          const haystack = [item.brand, item.name, item.model, item.side, item.category].join(' ').toLowerCase();
+          return tokens.every((token) => haystack.includes(token));
+        })
+      : inventory;
+    return pool.slice(0, 30);
+  })();
+  const selectedSalePart = saleForm.itemId
+    ? inventory.find((item) => String(item.id) === String(saleForm.itemId))
+    : null;
+
+  const handlePickSalePart = (item) => {
+    setSaleForm((previous) => ({ ...previous, itemId: item.id }));
+    setSaleSearch(getPartLabel(item));
+    setSaleSearchOpen(false);
+    setSaleHighlight(0);
+  };
+
   const handleAdminSubmit = async (event) => {
     event.preventDefault();
     const result = await saveAdminSettings(adminForm);
@@ -945,6 +997,18 @@ function App() {
     setStatusMessage('Spare part deleted successfully.');
   };
 
+  // "Add Sale" button on a part: open the Add Sale form with that part already chosen.
+  const handleStartSale = (item) => {
+    setEditingSaleId(null);
+    setSaleForm({ ...emptySaleForm, date: makeToday(), itemId: item.id });
+    setSaleSearch(getPartLabel(item));
+    setSaleSearchOpen(false);
+    setSaleHighlight(0);
+    setAdminSection('sale');
+    setActiveTab('admin');
+    setStatusMessage(`Adding a sale for ${getPartLabel(item)}.`);
+  };
+
   const findItemBySaleLabel = (label) =>
     inventory.find((item) => `${item.brand} ${item.name}` === label) ||
     inventory.find((item) => item.name === label);
@@ -952,7 +1016,10 @@ function App() {
   const handleAddSale = async (event) => {
     event.preventDefault();
     const chosenItem = inventory.find((item) => String(item.id) === String(saleForm.itemId));
-    if (!chosenItem) return;
+    if (!chosenItem) {
+      setStatusMessage('Search for a spare part and pick it from the list before recording the sale.');
+      return;
+    }
 
     const quantity = Number(saleForm.quantity) || 1;
     const amount = Number(saleForm.amount) || Number(chosenItem.salePrice || 0);
@@ -1839,6 +1906,7 @@ function App() {
                     </div>
                     {adminAuthenticated && (
                       <div className="mini-actions" style={{ marginTop: '10px' }}>
+                        <button type="button" className="primary-btn small" onClick={() => handleStartSale(item)}>Add Sale</button>
                         <button type="button" className="ghost-btn small" onClick={() => handleEditItem(item)}>Edit</button>
                         <button type="button" className="danger-btn small" onClick={() => handleDeleteItem(item.id)}>Delete</button>
                       </div>
@@ -2256,6 +2324,13 @@ function App() {
                             </div>
                             <button
                               type="button"
+                              className="primary-btn small"
+                              onClick={() => handleStartSale(item)}
+                            >
+                              Add Sale
+                            </button>
+                            <button
+                              type="button"
                               className="ghost-btn small"
                               onClick={() => {
                                 setCostForm({
@@ -2452,18 +2527,72 @@ function App() {
                   <>
                     <form className="entry-form" onSubmit={handleAddSale}>
                       <h3>{editingSaleId ? 'Edit Sale' : 'Add Sale'}</h3>
-                      <label>
-                        Spare part
-                        <select
-                          value={saleForm.itemId}
-                          onChange={(event) => setSaleForm({ ...saleForm, itemId: event.target.value })}
-                        >
-                          <option value="">Select spare part</option>
-                          {inventory.map((item) => (
-                            <option key={item.id} value={item.id}>{item.brand} {item.name}{item.side && item.side !== 'N/A' ? ` (${item.side})` : ''}</option>
-                          ))}
-                        </select>
-                      </label>
+                      <div className="part-search">
+                        <label>
+                          Spare part
+                          <input
+                            type="text"
+                            value={saleSearch}
+                            placeholder="Search by name, brand or model"
+                            autoComplete="off"
+                            onFocus={(event) => { event.target.select(); setSaleSearchOpen(true); }}
+                            onClick={() => setSaleSearchOpen(true)}
+                            onBlur={() => setSaleSearchOpen(false)}
+                            onChange={(event) => {
+                              setSaleSearch(event.target.value);
+                              setSaleForm({ ...saleForm, itemId: '' });
+                              setSaleHighlight(0);
+                              setSaleSearchOpen(true);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'ArrowDown') {
+                                event.preventDefault();
+                                setSaleSearchOpen(true);
+                                setSaleHighlight((index) => Math.min(index + 1, Math.max(saleMatches.length - 1, 0)));
+                              } else if (event.key === 'ArrowUp') {
+                                event.preventDefault();
+                                setSaleHighlight((index) => Math.max(index - 1, 0));
+                              } else if (event.key === 'Enter' && saleSearchOpen && saleMatches[saleHighlight]) {
+                                event.preventDefault();
+                                handlePickSalePart(saleMatches[saleHighlight]);
+                              } else if (event.key === 'Escape') {
+                                setSaleSearchOpen(false);
+                              }
+                            }}
+                          />
+                        </label>
+                        {saleSearchOpen && (
+                          <ul role="listbox" style={partSearchListStyle}>
+                            {saleMatches.length > 0 ? saleMatches.map((item, index) => (
+                              <li
+                                key={item.id}
+                                role="option"
+                                aria-selected={String(item.id) === String(saleForm.itemId)}
+                                style={partSearchRowStyle(index === saleHighlight)}
+                                onMouseEnter={() => setSaleHighlight(index)}
+                                onMouseDown={(event) => {
+                                  // keep focus in the input so onBlur doesn't close the list before the pick registers
+                                  event.preventDefault();
+                                  handlePickSalePart(item);
+                                }}
+                              >
+                                <span>
+                                  {getPartLabel(item)}
+                                  <small style={{ display: 'block', opacity: 0.7 }}>{[item.category, item.model].filter(Boolean).join(' · ')}</small>
+                                </span>
+                                <small style={{ whiteSpace: 'nowrap' }}>Stock {item.stock} · KES {Number(item.salePrice).toLocaleString()}</small>
+                              </li>
+                            )) : (
+                              <li style={{ padding: '8px 10px', opacity: 0.7 }}>No matching parts</li>
+                            )}
+                          </ul>
+                        )}
+                        {selectedSalePart && !saleSearchOpen && (
+                          <small style={{ display: 'block', margin: '4px 0 10px', opacity: 0.8 }}>
+                            In stock: {selectedSalePart.stock} · Selling price: KES {Number(selectedSalePart.salePrice).toLocaleString()}
+                          </small>
+                        )}
+                      </div>
                       <div className="double-field">
                         <label>
                           Quantity
@@ -2480,6 +2609,7 @@ function App() {
                             type="number"
                             min="0"
                             value={saleForm.amount}
+                            placeholder={selectedSalePart ? `${Number(selectedSalePart.salePrice).toLocaleString()} (selling price)` : ''}
                             onChange={(event) => setSaleForm({ ...saleForm, amount: Number(event.target.value) || '' })}
                           />
                         </label>
@@ -2495,7 +2625,7 @@ function App() {
                       <div className="button-row">
                         <button type="submit" className="primary-btn">{editingSaleId ? 'Save sale' : 'Record sale'}</button>
                         {editingSaleId && (
-                          <button type="button" className="ghost-btn" onClick={() => { setEditingSaleId(null); setSaleForm(emptySaleForm); }}>Cancel</button>
+                          <button type="button" className="ghost-btn" onClick={() => { setEditingSaleId(null); setSaleForm(emptySaleForm); setSaleSearch(''); setSaleSearchOpen(false); }}>Cancel</button>
                         )}
                       </div>
                     </form>
@@ -2520,7 +2650,7 @@ function App() {
                             <div className="mini-actions">
                               <strong>KES {Number(sale.amount).toLocaleString()}</strong>
                               <button type="button" className="ghost-btn small" onClick={() => handlePrintSaleProfitLoss(sale)}>🖨️ P&amp;L</button>
-                              <button type="button" className="ghost-btn small" onClick={() => { setEditingSaleId(sale.id); setSaleForm({ itemId: inventory.find((item) => item.name === sale.item.split(' ').slice(1).join(' ') || item.name === sale.item)?.id || '', quantity: Number(sale.quantity) || 1, amount: sale.amount, date: sale.date }); }}>Edit</button>
+                              <button type="button" className="ghost-btn small" onClick={() => { const part = findItemBySaleLabel(sale.item); setEditingSaleId(sale.id); setSaleForm({ itemId: part?.id || '', quantity: Number(sale.quantity) || 1, amount: sale.amount, date: sale.date }); setSaleSearch(part ? getPartLabel(part) : sale.item); setSaleSearchOpen(false); }}>Edit</button>
                               <button type="button" className="danger-btn small" onClick={() => handleDeleteSale(sale.id)}>Delete</button>
                             </div>
                           </li>
